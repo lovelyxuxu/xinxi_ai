@@ -1,1 +1,0 @@
-from src.embedding.embedding_service import EmbeddingService

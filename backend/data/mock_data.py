@@ -8,7 +8,7 @@
     python -m data.mock_data    # 直接运行，将数据写入 Chroma
 """
 
-from src.models.user_profile import UserProfile
+from core.models.user_profile import UserProfile
 
 # ============================================================
 # 模拟用户数据 - 12 位虚拟用户（6男6女）

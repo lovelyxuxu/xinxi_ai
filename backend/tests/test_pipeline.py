@@ -8,8 +8,8 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from src.embedding.embedding_service import EmbeddingService
-from src.database.chroma_store import ChromaStore
+from core.embedding.embedding_service import EmbeddingService
+from core.database.chroma_store import ChromaStore
 from data.mock_data import get_mock_users
 
 

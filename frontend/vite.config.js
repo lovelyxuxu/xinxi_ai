@@ -7,7 +7,13 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      // 把 /api 请求转发到后端 FastAPI 服务
+      // WebSocket 匹配路由（必须放在 /api 前面，优先匹配）
+      '/api/match/ws': {
+        target: 'http://127.0.0.1:8000',
+        ws: true,           // 启用 WebSocket 代理
+        changeOrigin: true,
+      },
+      // HTTP API 请求转发到后端 FastAPI 服务
       '/api': {
         target: 'http://127.0.0.1:8000',
         changeOrigin: true,

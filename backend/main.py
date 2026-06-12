@@ -34,7 +34,7 @@ if sys.platform == "win32":
         sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
         sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
 
-# 确保项目根目录在 Python 路径中（这样 import src.xxx 才能正常工作）
+# 确保项目根目录在 Python 路径中（这样 import core.xxx 才能正常工作）
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from rich.console import Console
@@ -42,12 +42,12 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.markdown import Markdown
 
-from src.embedding.embedding_service import EmbeddingService
-from src.database.chroma_store import ChromaStore
-from src.retrieval.hybrid_retriever import HybridRetriever
-from src.agent.graph import build_matching_graph
-from src.agent.state import AgentState
-from src.models.user_profile import UserProfile
+from core.embedding.embedding_service import EmbeddingService
+from core.database.chroma_store import ChromaStore
+from core.retrieval.hybrid_retriever import HybridRetriever
+from core.agent.graph import build_matching_graph
+from core.agent.state import AgentState
+from core.models.user_profile import UserProfile
 from data.mock_data import get_mock_users, get_mock_user_by_id
 
 

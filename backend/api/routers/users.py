@@ -19,7 +19,7 @@ from api.schemas import (
     UserListResponse, MessageResponse,
 )
 from api.deps import get_services, AppServices, generate_user_id
-from src.models.user_profile import UserProfile
+from core.models.user_profile import UserProfile
 
 router = APIRouter(prefix="/api/users", tags=["用户管理"])
 

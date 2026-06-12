@@ -22,9 +22,8 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 
-from api.routers import users, matching
+from api.routers import users, matching, interview
 
 
 def create_app() -> FastAPI:
@@ -42,28 +41,32 @@ def create_app() -> FastAPI:
     )
 
     # ============================================================
-    # CORS 配置
+    # CORS 说明（已移除 CORSMiddleware）
     # ============================================================
-    # 允许前端开发服务器跨域访问。
-    # React 开发时默认端口是 3000 或 5173（Vite）。
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=[
-            "http://localhost:3000",   # React dev server (CRA)
-            "http://localhost:5173",   # Vite dev server
-            "http://127.0.0.1:3000",
-            "http://127.0.0.1:5173",
-        ],
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
+    # 学习要点：
+    # Starlette 的 CORSMiddleware 会拦截没有合法 Origin 头的 WebSocket upgrade 请求，
+    # 直接返回 403——这正是 Phase 3 WebSocket Bug 的根本原因。
+    #
+    # 解决方案（Option C）：
+    # 开发环境下，前端通过 Vite proxy 访问后端（/api → http://127.0.0.1:8000），
+    # Vite proxy 已经处理了跨域问题，不需要后端再加 CORS 头。
+    # WebSocket 连接也走 Vite proxy，同样不需要后端 CORS。
+    #
+    # 生产环境部署时（前后端独立域名），再在此处添加 CORSMiddleware 即可：
+    # from fastapi.middleware.cors import CORSMiddleware
+    # app.add_middleware(
+    #     CORSMiddleware,
+    #     allow_origins=["https://your-frontend-domain.com"],
+    #     allow_methods=["*"],
+    #     allow_headers=["*"],
+    # )
 
     # ============================================================
     # 注册路由
     # ============================================================
     app.include_router(users.router)
     app.include_router(matching.router)
+    app.include_router(interview.router)
 
     # ============================================================
     # 健康检查接口

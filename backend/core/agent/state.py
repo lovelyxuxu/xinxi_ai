@@ -18,7 +18,7 @@
 """
 
 from typing import TypedDict, Optional, Any
-from src.models.user_profile import UserProfile
+from core.models.user_profile import UserProfile
 
 
 class AgentState(TypedDict, total=False):

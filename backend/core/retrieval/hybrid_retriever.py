@@ -17,8 +17,8 @@
 """
 
 from typing import Optional
-from src.database.chroma_store import ChromaStore
-from src.models.user_profile import UserProfile
+from core.database.chroma_store import ChromaStore
+from core.models.user_profile import UserProfile
 
 
 class HybridRetriever:

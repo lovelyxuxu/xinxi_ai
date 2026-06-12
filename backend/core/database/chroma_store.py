@@ -20,8 +20,8 @@ from chromadb.api.types import EmbeddingFunction, Documents, Embeddings
 from typing import Optional
 
 from config.settings import chroma_config
-from src.embedding.embedding_service import EmbeddingService
-from src.models.user_profile import UserProfile
+from core.embedding.embedding_service import EmbeddingService
+from core.models.user_profile import UserProfile
 
 
 class _ChromaEmbeddingAdapter(EmbeddingFunction):
