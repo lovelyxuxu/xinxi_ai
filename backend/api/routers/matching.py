@@ -37,6 +37,11 @@ from api.schemas import (
 from api.deps import get_services, AppServices, generate_match_id
 from core.agent.state import AgentState
 from core.models.user_profile import UserProfile
+# Phase 3: LangFuse 可观测性集成
+from core.utils.observability import (
+    create_langfuse_callback,
+    flush_langfuse,
+)
 
 router = APIRouter(prefix="/api/match", tags=["匹配推荐"])
 
@@ -118,7 +123,23 @@ def trigger_match(body: MatchRequest, svc: AppServices = Depends(get_services)):
     # 格式：match_{user_id}_{timestamp}，既唯一又可追溯
     match_thread_id = f"match_{body.user_id}_{datetime.now().strftime('%Y%m%d%H%M%S')}"
     config = {"configurable": {"thread_id": match_thread_id}}
+
+    # Phase 3: 创建 LangFuse 回调处理器（如果已启用）
+    # CallbackHandler 会自动追踪所有 LLM 调用并上报到 LangFuse Dashboard
+    langfuse_handler = create_langfuse_callback(
+        user_id=body.user_id,
+        session_id=match_thread_id,
+        tags=["match", "sync"],
+    )
+    if langfuse_handler:
+        config["callbacks"] = [langfuse_handler]
+        # 将 trace_id 存入初始状态，供 Judge Agent 上报评分使用
+        initial_state["langfuse_trace_id"] = langfuse_handler._xinxi_trace_id
+
     final_state = svc.matching_graph.invoke(initial_state, config=config)
+
+    # Phase 3: 确保所有追踪数据都发送到 LangFuse 服务器
+    flush_langfuse(langfuse_handler)
 
     result_data = _build_final_result(final_state, body.user_id)
     result = MatchResult(**result_data)
@@ -201,10 +222,23 @@ async def ws_match(websocket: WebSocket, user_id: str):
     # 4. 使用 astream_events 流式执行，逐节点推送进度
     #    同时收集各节点输出，拼成完整的 final_state
     final_state: dict = {}
+    langfuse_handler = None
     try:
         # Phase 4: 每次匹配使用唯一 thread_id
         match_thread_id = f"match_{user_id}_{datetime.now().strftime('%Y%m%d%H%M%S')}"
         config = {"configurable": {"thread_id": match_thread_id}}
+
+        # Phase 3: 创建 LangFuse 回调处理器
+        # CallbackHandler 会追踪所有 LLM 调用，并自动关联到这个 trace
+        langfuse_handler = create_langfuse_callback(
+            user_id=user_id,
+            session_id=match_thread_id,
+            tags=["match", "websocket"],
+        )
+        if langfuse_handler:
+            config["callbacks"] = [langfuse_handler]
+            # 将 trace_id 存入初始状态，供 Judge Agent 上报评分使用
+            initial_state["langfuse_trace_id"] = langfuse_handler._xinxi_trace_id
         
         async for event in svc.matching_graph.astream_events(
             initial_state,
@@ -247,14 +281,21 @@ async def ws_match(websocket: WebSocket, user_id: str):
                     })
 
     except WebSocketDisconnect:
+        # Phase 3: 即使客户端断开，也要 flush 已收集的追踪数据
+        flush_langfuse(langfuse_handler)
         return
     except Exception as e:
+        # Phase 3: 出错时也要 flush 追踪数据（记录到出错位置的信息）
+        flush_langfuse(langfuse_handler)
         await websocket.send_json({
             "type": "error",
             "message": f"匹配流程出错: {str(e)}",
         })
         await websocket.close(code=1011)
         return
+
+    # Phase 3: 流式执行完成，flush 所有追踪数据到 LangFuse 服务器
+    flush_langfuse(langfuse_handler)
 
     # 5. 如果 final_state 为空（异常情况），给一个兜底
     if not final_state:

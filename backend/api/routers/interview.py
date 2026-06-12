@@ -26,6 +26,8 @@ from langchain_core.messages import HumanMessage, AIMessage
 
 from api.deps import get_services
 from core.agent.interview.state import InterviewState
+# Phase 3: LangFuse 可观测性集成
+from core.utils.observability import create_langfuse_callback, flush_langfuse
 
 router = APIRouter(prefix="/api/interview", tags=["用户访谈"])
 
@@ -42,6 +44,7 @@ async def ws_interview(websocket: WebSocket, user_id: str):
     """
     await websocket.accept()
     svc = get_services()
+    langfuse_handler = None  # Phase 3: 在 finally 中使用，需要先初始化
 
     # 1. 验证用户并重建/初始化访谈状态
     user_data = svc.chroma_store.get_user(user_id)
@@ -58,6 +61,17 @@ async def ws_interview(websocket: WebSocket, user_id: str):
     # 尝试从检查点获取状态，如果不存在则初始化
     # 访谈使用固定的 thread_id（interview_{user_id}），支持跨会话继续
     config = {"configurable": {"thread_id": f"interview_{user_id}"}}
+
+    # Phase 3: 创建 LangFuse 回调处理器（如果已启用）
+    # 访谈的 session_id 使用 interview_{user_id}，可以追踪用户的所有访谈对话
+    langfuse_handler = create_langfuse_callback(
+        user_id=user_id,
+        session_id=f"interview_{user_id}",
+        tags=["interview"],
+    )
+    if langfuse_handler:
+        config["callbacks"] = [langfuse_handler]
+
     state = svc.interview_graph.get_state(config)
 
     if not state.values:
@@ -130,6 +144,8 @@ async def ws_interview(websocket: WebSocket, user_id: str):
     except Exception as e:
         await websocket.send_json({"type": "error", "message": f"访谈异常: {str(e)}"})
     finally:
+        # Phase 3: 确保所有追踪数据发送到 LangFuse 服务器
+        flush_langfuse(langfuse_handler)
         try:
             await websocket.close()
         except:

@@ -1,0 +1,90 @@
+# ============================================================
+# 心犀AI - LangFuse 本地部署（Docker Compose）
+# ============================================================
+#
+# 【学习要点】
+# Docker Compose 是一个"容器编排"工具：
+#   - 用一个 YAML 文件描述多个容器的配置和依赖关系
+#   - 一条命令就能启动所有服务（docker compose up）
+#   - 非常适合本地开发和测试环境
+#
+# 为什么需要 Docker 部署 LangFuse？
+# --------------------------------
+# LangFuse 是一个 Web 应用 + 数据库的组合：
+#   - Web 服务：提供 Dashboard（可视化界面）和 API（接收追踪数据）
+#   - PostgreSQL：存储追踪数据、用户信息、项目配置
+# 用 Docker Compose 可以一键启动这两个服务，不影响本机的其他环境。
+#
+# 使用方式：
+#   1. 安装 Docker Desktop: https://www.docker.com/products/docker-desktop/
+#   2. 在项目根目录运行:  docker compose up -d
+#   3. 打开浏览器访问:    http://localhost:3000
+#   4. 注册账号 → 创建项目 → 获取 API Key
+#   5. 将 API Key 填入 backend/.env
+#   6. 设置 LANGFUSE_ENABLED=true
+#   7. 重启后端服务
+#
+# 停止服务:  docker compose down
+# 查看日志:  docker compose logs -f langfuse-web
+# ============================================================
+
+services:
+
+  # ─── PostgreSQL 数据库 ───
+  # LangFuse 使用 PostgreSQL 存储所有追踪数据
+  # 包括：Trace、Observation、Score、用户信息、项目配置等
+  langfuse-db:
+    image: postgres:16-alpine
+    container_name: xinxi-langfuse-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: langfuse
+      POSTGRES_PASSWORD: langfuse
+      POSTGRES_DB: langfuse
+    volumes:
+      # 持久化数据：容器删除后数据不丢失
+      - langfuse_postgres_data:/var/lib/postgresql/data
+    # 不暴露端口到宿主机——只有 langfuse-web 容器能访问数据库
+    # 这是安全最佳实践：最小化暴露面
+    # 如果需要本地用 pgAdmin 等工具连接，可以取消注释下面两行
+    # ports:
+    #   - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U langfuse"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ─── LangFuse Web 服务 ───
+  # 提供 Dashboard（Web 界面）和 API（接收追踪数据）
+  langfuse-web:
+    image: langfuse/langfuse:2
+    container_name: xinxi-langfuse-web
+    restart: unless-stopped
+    depends_on:
+      langfuse-db:
+        condition: service_healthy
+    ports:
+      # 将容器的 3000 端口映射到宿主机的 3000 端口
+      # 访问 http://localhost:3000 即可打开 Dashboard
+      - "3000:3000"
+    environment:
+      # --- 数据库连接配置 ---
+      DATABASE_URL: postgresql://langfuse:langfuse@langfuse-db:5432/langfuse
+
+      # --- NextAuth 配置（Web 认证框架）---
+      NEXTAUTH_SECRET: xinxi-langfuse-dev-secret-change-in-prod
+      NEXTAUTH_URL: http://localhost:3000
+
+      # --- 加密盐值（用于加密存储敏感数据）---
+      SALT: xinxi-langfuse-dev-salt-change-in-production
+
+      # --- 遥测（可选，禁用匿名使用统计）---
+      TELEMETRY_ENABLED: "false"
+
+      # --- 端口 ---
+      PORT: "3000"
+
+volumes:
+  # Docker 管理的命名卷——比绑定挂载更适合数据库数据
+  langfuse_postgres_data:

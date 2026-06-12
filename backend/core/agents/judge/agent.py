@@ -31,6 +31,8 @@ from core.agents.supervisor.state import SupervisorState
 from core.utils.llm_factory import create_ll
 from core.utils.json_parser import parse_json_response
 from core.models.llm_outputs import MatchEvaluation
+# Phase 3: LangFuse 评分上报（可观测性闭环）
+from core.utils.observability import langfuse_report_scores
 
 
 # ============================================================
@@ -152,6 +154,17 @@ def judge_agent(state: SupervisorState) -> dict:
 
     messages.append(f"   评估完成：整体评分 {evaluation.overall_score}/10")
     messages.append(f"   优点: {evaluation.strengths}")
+
+    # Phase 3: 将评估分数上报到 LangFuse（可观测性闭环）
+    # 在 Dashboard 上可以看到匹配质量的趋势变化
+    trace_id = state.get("langfuse_trace_id", "")
+    if trace_id:
+        langfuse_report_scores(
+            trace_id=trace_id,
+            user_id=user.user_id,
+            evaluation=evaluation.model_dump(),
+        )
+        messages.append("   📊 评分已上报 LangFuse")
 
     return {
         "evaluation": evaluation.model_dump(),

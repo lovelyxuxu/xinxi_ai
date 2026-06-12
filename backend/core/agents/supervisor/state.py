@@ -113,5 +113,14 @@ class SupervisorState(TypedDict, total=False):
     原版是独立的 REST 端点，现在集成到图中自动执行。
     """
 
+    # === 可观测性（Phase 3：LangFuse 追踪）===
+    langfuse_trace_id: str
+    """
+    LangFuse 追踪 ID。
+    在图执行开始前生成，存入 State，供 Judge Agent 上报评分时使用。
+    格式：match_{user_id}_{timestamp}
+    如果 LangFuse 未启用，此字段为空字符串。
+    """
+
     # === 调试信息 ===
     messages: list[str]
