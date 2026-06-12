@@ -49,8 +49,38 @@ class MatchConfig:
     max_agent_loops: int = int(os.getenv("MAX_AGENT_LOOPS", "3"))
 
 
+class SupervisorConfig:
+    """
+    Supervisor 多 Agent 架构配置
+
+    学习要点：
+    - USE_SUPERVISOR: True 使用新的 Supervisor 多 Agent 图，False 使用旧版单 Agent 图
+    - ROUTER_MODE: "rule" 使用规则版路由（稳定），"llm" 使用 LLM 版路由（灵活）
+    - 通过环境变量可以热切换，方便对比学习两种架构的差异
+    """
+    use_supervisor: bool = os.environ.get("USE_SUPERVISOR", "true").lower() == "true"
+    router_mode: str = os.environ.get("SUPERVISOR_ROUTER", "rule")
+
+
+class LangFuseConfig:
+    """
+    LangFuse 可观测性配置（Phase 3 使用）
+
+    学习要点：
+    - LangFuse 是开源的 LLM 可观测性平台，可以追踪每次 LLM 调用
+    - 通过 LangChain 的 Callback 机制集成，无需修改业务代码
+    - enabled 设为 True 后，所有 LLM 调用会自动上报到 LangFuse Dashboard
+    """
+    enabled: bool = os.environ.get("LANGFUSE_ENABLED", "false").lower() == "true"
+    public_key: str = os.getenv("LANGFUSE_PUBLIC_KEY", "")
+    secret_key: str = os.getenv("LANGFUSE_SECRET_KEY", "")
+    host: str = os.getenv("LANGFUSE_HOST", "http://localhost:3000")
+
+
 # 统一导出所有配置，方便其他模块引用
 llm_config = LLMConfig()
 embedding_config = EmbeddingConfig()
 chroma_config = ChromaConfig()
 match_config = MatchConfig()
+supervisor_config = SupervisorConfig()
+langfuse_config = LangFuseConfig()

@@ -2,41 +2,23 @@
 心犀AI - 用户访谈 Subgraph 节点函数
 =====================================
 定义访谈流程中的核心逻辑节点。
+
+【重构说明】
+之前 _create_ll 和 _parse_json_response 在这里各定义了一遍，
+现在统一从 core.utils 导入，消除重复代码。
+interview 版本的 _parse_json_response 之前缺少"数组提取"策略，
+现在使用共享版本，自动获得完整的三种解析策略。
 """
 
-import json
-import re
-from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.messages import AIMessage, HumanMessage
 
 from config.settings import llm_config
 from core.agent.interview.state import InterviewState
 from core.models.llm_outputs import InterviewExtraction
-
-
-def _create_ll(temperature: float = 0.7) -> ChatOpenAI:
-    """创建 LLM 实例"""
-    return ChatOpenAI(
-        model=llm_config.model,
-        api_key=llm_config.api_key,
-        base_url=llm_config.base_url,
-        temperature=temperature,
-    )
-
-
-def _parse_json_response(text: str) -> dict:
-    """从回复中提取 JSON"""
-    code_block = re.search(r'```(?:json)?\s*\n?(.*?)\n?\s*```', text, re.DOTALL)
-    if code_block:
-        return json.loads(code_block.group(1).strip())
-    
-    first_brace = text.find('{')
-    last_brace = text.rfind('}')
-    if first_brace != -1 and last_brace > first_brace:
-        return json.loads(text[first_brace:last_brace + 1])
-    
-    raise ValueError(f"无法解析 JSON: {text[:200]}")
+# 【重构】从共享工具模块导入
+from core.utils.llm_factory import create_ll as _create_ll
+from core.utils.json_parser import parse_json_response as _parse_json_response
 
 
 # ============================================================

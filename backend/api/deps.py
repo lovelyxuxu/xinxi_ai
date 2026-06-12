@@ -22,6 +22,11 @@ Phase 4 检查点持久化：
   SqliteSaver 只支持同步方法，用在异步上下文中会报：
   "The SqliteSaver does not support async methods"
   解决方案：使用 AsyncSqliteSaver（基于 aiosqlite）。
+
+Phase 2 多 Agent 架构：
+---------------------
+- USE_SUPERVISOR=True 时使用 Supervisor 多 Agent 图
+- USE_SUPERVISOR=False 时使用旧版单 Agent 图（便于对比学习）
 """
 
 import uuid
@@ -35,9 +40,13 @@ from langgraph.checkpoint.memory import MemorySaver
 from core.embedding.embedding_service import EmbeddingService
 from core.database.chroma_store import ChromaStore
 from core.retrieval.hybrid_retriever import HybridRetriever
-from core.agent.graph import build_matching_graph
+
+# 导入新旧两种图构建器
+from core.agent.graph import build_matching_graph as build_legacy_graph
+from core.agents.supervisor.graph import build_supervisor_graph
 from core.agent.interview.graph import build_interview_graph
 from core.models.user_profile import UserProfile
+from config.settings import supervisor_config
 from data.mock_data import get_mock_users
 
 # Phase 4: True = 使用 AsyncSqliteSaver（持久化到磁盘）, False = 使用 MemorySaver（纯内存）
@@ -67,11 +76,8 @@ class AppServices:
         # Phase 4: 先用 MemorySaver 占位，后续由 setup_checkpointer() 替换
         self.checkpointer = MemorySaver()
 
-        # 编译图时传入 checkpointer
-        self.matching_graph = build_matching_graph(
-            self.retriever,
-            checkpointer=self.checkpointer
-        )
+        # Phase 2: 根据配置选择图架构
+        self.matching_graph = self._build_graph(checkpointer=self.checkpointer)
 
         # Phase 5: 初始化访谈子图
         self.interview_graph = build_interview_graph(
@@ -85,6 +91,21 @@ class AppServices:
         # 3. 导入模拟数据（如果数据库为空）
         if self.chroma_store.get_user_count() == 0:
             self._load_mock_data()
+
+    def _build_graph(self, checkpointer=None):
+        """
+        根据配置构建匹配图。
+
+        学习要点：
+        - 工厂方法模式：封装图构建的决策逻辑
+        - 向后兼容：旧的图代码保留不动，通过开关切换
+        """
+        if supervisor_config.use_supervisor:
+            print("  [Phase 2] Using Supervisor multi-agent graph")
+            return build_supervisor_graph(self.retriever, checkpointer=checkpointer)
+        else:
+            print("  [Phase 2] Using legacy single-agent graph")
+            return build_legacy_graph(self.retriever, checkpointer=checkpointer)
 
     async def setup_checkpointer(self):
         """
@@ -105,10 +126,7 @@ class AppServices:
             await self.checkpointer.setup()
 
             # 用新的 checkpointer 重新编译图
-            self.matching_graph = build_matching_graph(
-                self.retriever,
-                checkpointer=self.checkpointer
-            )
+            self.matching_graph = self._build_graph(checkpointer=self.checkpointer)
             self.interview_graph = build_interview_graph(
                 checkpointer=self.checkpointer
             )

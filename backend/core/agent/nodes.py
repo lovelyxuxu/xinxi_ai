@@ -26,6 +26,7 @@ v2 → v3 的变更：
 
 import json
 import re
+from functools import partial
 
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
@@ -38,69 +39,9 @@ from core.models.llm_outputs import (
     AnalysisResultList,
     ReflectionResult,
 )
-
-
-def _create_ll(temperature: float = None) -> ChatOpenAI:
-    """
-    创建 LLM 实例的工厂函数。
-    DeepSeek 兼容 OpenAI 的 API 协议，所以用 ChatOpenAI 即可对接。
-    """
-    return ChatOpenAI(
-        model=llm_config.model,
-        api_key=llm_config.api_key,
-        base_url=llm_config.base_url,
-        temperature=temperature if temperature is not None else llm_config.temperature,
-    )
-
-
-def _parse_json_response(text: str) -> dict | list:
-    """
-    从 LLM 回复文本中提取 JSON 对象。
-
-    学习要点：
-    DeepSeek thinking 模型会在 JSON 前后输出思考过程文本，
-    所以不能直接 json.loads(text)，需要先定位 JSON 块。
-
-    策略：
-    1. 先尝试找 ```json ... ``` 代码块
-    2. 再尝试找第一个 { 到最后一个 } 之间的内容
-    3. 再尝试找第一个 [ 到最后一个 ] 之间的内容
-    4. 都失败则抛出异常
-    """
-    text = text.strip()
-
-    # 策略1：尝试提取 ```json ... ``` 代码块
-    code_block = re.search(r'```(?:json)?\s*\n?(.*?)\n?\s*```', text, re.DOTALL)
-    if code_block:
-        return json.loads(code_block.group(1).strip())
-
-    # 策略2：找最外层的 { ... }
-    first_brace = text.find('{')
-    last_brace = text.rfind('}')
-    if first_brace != -1 and last_brace > first_brace:
-        try:
-            return json.loads(text[first_brace:last_brace + 1])
-        except json.JSONDecodeError:
-            pass
-
-    # 策略3：找最外层的 [ ... ]
-    first_bracket = text.find('[')
-    last_bracket = text.rfind(']')
-    if first_bracket != -1 and last_bracket > first_bracket:
-        try:
-            return json.loads(text[first_bracket:last_bracket + 1])
-        except json.JSONDecodeError:
-            pass
-
-    # 都失败，抛出原始错误
-    raise ValueError(f"无法从 LLM 回复中提取 JSON:\n{text[:500]}")
-
-
-# JSON 输出指令（附加在 Prompt 末尾，要求 LLM 以 JSON 格式输出）
-_JSON_SUFFIX = """
-请严格按照以下 JSON 格式输出，不要添加任何额外文本或解释：
-{json_schema}
-"""
+# 【重构】从共享工具模块导入，消除三处重复的工厂函数和解析器
+from core.utils.llm_factory import create_ll as _create_ll
+from core.utils.json_parser import parse_json_response as _parse_json_response, JSON_SUFFIX as _JSON_SUFFIX
 
 
 def _invoke_structured(llm: ChatOpenAI, prompt_messages, model_class):
@@ -110,7 +51,7 @@ def _invoke_structured(llm: ChatOpenAI, prompt_messages, model_class):
     这是替代 with_structured_output() 的兼容方案：
     1. 在 prompt 末尾追加 JSON 格式说明
     2. 调用 LLM 获取自由文本回复
-    3. 从回复中提取 JSON
+    3. 从回复中提取 JSON（使用共享的 _parse_json_response）
     4. 用 Pydantic model_validate 校验并构造模型实例
 
     学习要点：
@@ -224,6 +165,11 @@ def hybrid_search(state: AgentState, retriever: HybridRetriever) -> dict:
 
     注意：这个节点需要外部注入 retriever 实例，
     我们会用 functools.partial 在 graph.py 中绑定它。
+
+    学习要点：
+    - hard_filters 来自 parse_intent 节点的 LLM 分析结果
+    - 将 hard_filters 传给 retriever，让 LLM 的智能分析真正影响检索过滤
+    - 这比直接从 UserProfile 读原始字段更"智能"，因为 LLM 可能做了推理调整
     """
     user = state["user_profile"]
     query_text = state["rewritten_query"]
@@ -231,6 +177,12 @@ def hybrid_search(state: AgentState, retriever: HybridRetriever) -> dict:
     retry_strategy = state.get("retry_strategy", "")
     messages = state.get("messages", [])
     messages.append("📋 第二步：执行混合检索...")
+
+    # 从状态中获取 LLM 提取的硬性过滤条件
+    # 如果 parse_intent 节点已执行，这里会有 LLM 分析的 hard_filters
+    hard_filters = state.get("hard_filters")
+    if hard_filters:
+        messages.append(f"   使用 LLM 提取的硬性条件: {hard_filters}")
 
     # 决定是否放宽条件
     relaxed = loop_count > 0  # 非首次检索时，启用放宽模式
@@ -240,12 +192,13 @@ def hybrid_search(state: AgentState, retriever: HybridRetriever) -> dict:
         query_text = state["new_query"]
         messages.append("   使用重写后的搜索文本")
 
-    # 执行检索
+    # 执行检索（传入 hard_filters 让 LLM 的智能分析生效）
     candidates = retriever.retrieve(
         user=user,
         query_text=query_text,
         n_results=match_config.max_candidates,
         relaxed=relaxed,
+        hard_filters=hard_filters,
     )
 
     messages.append(f"   检索到 {len(candidates)} 位候选人 (relaxed={relaxed})")

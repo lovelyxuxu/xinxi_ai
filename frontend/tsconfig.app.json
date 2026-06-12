@@ -1,0 +1,48 @@
+/**
+ * 心犀AI - 应用代码 TypeScript 配置
+ * ==================================
+ *
+ * 【学习要点】
+ * 这个文件配置了前端应用代码（src/ 下的 .tsx/.ts 文件）的编译规则。
+ *
+ * - "strict": true — 开启所有严格类型检查，帮你尽早发现 bug
+ * - "jsx": "react-jsx" — 告诉 TS 如何解析 JSX 语法（React 17+ 的新 JSX 转换）
+ * - "noEmit": true — TS 只做类型检查，不输出文件（Vite 自己负责打包）
+ * - "moduleResolution": "bundler" — Vite/esbuild 的模块解析方式
+ */
+{
+  "compilerOptions": {
+    /* ===== 类型安全 ===== */
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedSideEffectImports": true,
+
+    /* ===== 模块系统 ===== */
+    "target": "ES2020",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+
+    /* ===== JSX 支持 ===== */
+    "jsx": "react-jsx",
+
+    /* ===== 路径别名（与 vite.config.ts 保持一致）===== */
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    },
+
+    /* ===== 输出 ===== */
+    "noEmit": true,
+
+    /* ===== 互操作性 ===== */
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true
+  },
+  "include": ["src"]
+}

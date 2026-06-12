@@ -30,38 +30,9 @@ from langchain_core.prompts import ChatPromptTemplate
 
 from config.settings import llm_config
 from core.models.llm_outputs import MatchEvaluation
-
-
-# ============================================================
-# Judge 模型（可以配置不同的 LLM，这里复用同一个 DeepSeek）
-# ============================================================
-
-def _create_judge_llm(temperature: float = 0.2) -> ChatOpenAI:
-    """
-    创建 Judge LLM 实例。
-    使用较低温度（0.2）确保评估的稳定性和一致性。
-    """
-    return ChatOpenAI(
-        model=llm_config.model,
-        api_key=llm_config.api_key,
-        base_url=llm_config.base_url,
-        temperature=temperature,
-    )
-
-
-def _parse_json_response(text: str) -> dict:
-    """从 LLM 回复中提取 JSON"""
-    text = text.strip()
-    code_block = re.search(r'```(?:json)?\s*\n?(.*?)\n?\s*```', text, re.DOTALL)
-    if code_block:
-        return json.loads(code_block.group(1).strip())
-
-    first_brace = text.find('{')
-    last_brace = text.rfind('}')
-    if first_brace != -1 and last_brace > first_brace:
-        return json.loads(text[first_brace:last_brace + 1])
-
-    raise ValueError(f"无法从 LLM 回复中提取 JSON:\n{text[:500]}")
+# 【重构】从共享工具模块导入，消除重复代码
+from core.utils.llm_factory import create_ll as _create_judge_llm
+from core.utils.json_parser import parse_json_response as _parse_json_response
 
 
 # ============================================================

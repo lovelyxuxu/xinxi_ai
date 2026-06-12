@@ -135,12 +135,24 @@ def trigger_match(body: MatchRequest, svc: AppServices = Depends(get_services)):
 # ============================================================
 
 # 节点名称到中文描述的映射
+# 学习要点：Supervisor 架构引入了新的节点名（如 supervisor, intent_agent 等）
+# 这里同时包含旧版和新版的节点名，确保两种架构都能正确显示中文描述
 _NODE_LABELS = {
+    # === 旧版单 Agent 图节点名（保持向后兼容）===
     "parse_intent": ("🔍", "意图解析", "正在分析用户资料和择偶偏好..."),
     "hybrid_search": ("📋", "混合检索", "正在向量数据库中搜索候选人..."),
     "post_analysis": ("🧠", "深度分析", "LLM 正在评估每位候选人的契合度..."),
     "reflection": ("🔄", "策略反思", "匹配结果不够理想，正在调整搜索策略..."),
     "generate_match": ("💌", "生成推荐信", "正在为最佳候选人撰写缘分推荐信..."),
+
+    # === 新版 Supervisor 多 Agent 图节点名 ===
+    "supervisor": ("🤖", "调度中心", "Supervisor 正在决定下一步执行哪个 Agent..."),
+    "intent_agent": ("🔍", "意图解析", "正在分析用户资料和择偶偏好..."),
+    "retrieval_agent": ("📋", "混合检索", "正在向量数据库中搜索候选人..."),
+    "analysis_agent": ("🧠", "深度分析", "LLM 正在评估每位候选人的契合度..."),
+    "reflection_agent": ("🔄", "策略反思", "匹配结果不够理想，正在调整搜索策略..."),
+    "letter_agent": ("💌", "生成推荐信", "正在为最佳候选人撰写缘分推荐信..."),
+    "judge_agent": ("⚖️", "质量评估", "LLM-as-Judge 正在评估匹配质量..."),
 }
 
 

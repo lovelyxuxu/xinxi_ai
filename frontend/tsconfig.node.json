@@ -1,0 +1,22 @@
+/**
+ * 心犀AI - Node.js 端 TypeScript 配置
+ * =====================================
+ *
+ * 【学习要点】
+ * vite.config.ts 是在 Node.js 环境中运行的，所以需要单独的 TS 配置。
+ * - "module": "ESNext" + "moduleResolution": "bundler" 让它能正确解析 ESM 模块
+ * - "tsBuildInfoFile" 存放增量编译的缓存，加速后续编译
+ */
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "allowSyntheticDefaultImports": true,
+    "strict": true,
+    "noEmit": true,
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.node.tsbuildinfo",
+    "skipLibCheck": true
+  },
+  "include": ["vite.config.ts"]
+}

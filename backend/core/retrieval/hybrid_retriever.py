@@ -35,7 +35,12 @@ class HybridRetriever:
         """
         self.store = chroma_store
 
-    def build_where_filter(self, user: UserProfile, relaxed: bool = False) -> Optional[dict]:
+    def build_where_filter(
+        self,
+        user: UserProfile,
+        relaxed: bool = False,
+        hard_filters: Optional[dict] = None,
+    ) -> Optional[dict]:
         """
         根据用户的择偶要求，构建 Chroma 的 where 过滤条件。
 
@@ -45,35 +50,63 @@ class HybridRetriever:
             user: 当前用户的画像
             relaxed: 是否放宽条件（Agent 反思循环中使用）
                      True 时会放松年龄范围和城市限制
+            hard_filters: LLM 提取的硬性过滤条件（来自意图解析节点）
+                          当提供时，优先使用 LLM 的分析结果，而非直接从
+                          UserProfile 中读取原始字段。
+                          示例: {"target_gender": "female", "age_min": 25,
+                                 "age_max": 32, "city": "北京"}
 
         返回:
             Chroma 格式的 where 过滤字典，或 None（如果没有过滤条件）
+
+        学习要点:
+            为什么要有 hard_filters 参数？
+            - UserProfile 中存的是用户原始输入（如 target_age_min=25）
+            - LLM 在意图解析时可能会做更智能的推理（如根据"希望找个成熟稳重的"
+              将 age_min 调整为 28）
+            - 传入 hard_filters 让 LLM 的分析结果真正生效，而不是被忽略
         """
         filters = []
 
+        # ============================================================
+        # 确定硬性过滤条件的来源：优先用 LLM 提取的 hard_filters
+        # ============================================================
+        # 学习要点：这种"优先用智能分析结果，回退到原始数据"的模式很常见
+        # 例如搜索引擎也会优先用 NLP 解析后的结构化查询，而不是用户原始输入
+        if hard_filters:
+            target_gender = hard_filters.get("target_gender", user.target_gender)
+            age_min_raw = hard_filters.get("age_min", user.target_age_min)
+            age_max_raw = hard_filters.get("age_max", user.target_age_max)
+            city_raw = hard_filters.get("city", user.target_city)
+        else:
+            target_gender = user.target_gender
+            age_min_raw = user.target_age_min
+            age_max_raw = user.target_age_max
+            city_raw = user.target_city
+
         # 条件1: 对方性别（始终严格执行，这是最基本的一票否决）
         # Chroma 的 where 语法：{"字段名": "值"} 表示精确匹配
-        filters.append({"gender": user.target_gender})
+        filters.append({"gender": target_gender})
 
         # 条件2: 年龄范围
         if relaxed:
             # 放宽模式：年龄范围各扩展 3 岁
-            age_min = max(18, user.target_age_min - 3)
-            age_max = user.target_age_max + 3
+            age_min = max(18, age_min_raw - 3)
+            age_max = age_max_raw + 3
         else:
-            age_min = user.target_age_min
-            age_max = user.target_age_max
+            age_min = age_min_raw
+            age_max = age_max_raw
 
         filters.append({"age": {"$gte": age_min}})
         filters.append({"age": {"$lte": age_max}})
 
         # 条件3: 城市/地域
-        if not relaxed and user.target_city and user.target_city != "不限":
+        if not relaxed and city_raw and city_raw != "不限":
             # 严格模式：同城过滤
-            filters.append({"city": user.target_city})
+            filters.append({"city": city_raw})
         elif relaxed:
             # 放宽模式：同省过滤（或完全不限）
-            if user.target_city and user.target_city != "不限":
+            if city_raw and city_raw != "不限":
                 filters.append({"province": user.province})
             # 如果用户本身就不限城市，则不加地域过滤
 
@@ -95,6 +128,7 @@ class HybridRetriever:
         query_text: str,
         n_results: int = 10,
         relaxed: bool = False,
+        hard_filters: Optional[dict] = None,
     ) -> list[dict]:
         """
         执行混合检索。
@@ -109,12 +143,11 @@ class HybridRetriever:
             query_text: 查询文本（可以是用户原始描述，也可以被 LLM 重写后）
             n_results: 返回的候选人数量
             relaxed: 是否放宽硬性条件
-
-        返回:
-            候选人列表，每个元素包含 user_id, metadata, document, distance
+            hard_filters: LLM 提取的硬性过滤条件（来自意图解析 Agent）
+                          当提供时，优先使用 LLM 的分析结果
         """
-        # 构建过滤条件
-        where_filter = self.build_where_filter(user, relaxed=relaxed)
+        # 构建过滤条件（传入 hard_filters 让 LLM 的智能分析生效）
+        where_filter = self.build_where_filter(user, relaxed=relaxed, hard_filters=hard_filters)
 
         # 执行检索
         results = self.store.search(

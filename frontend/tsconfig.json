@@ -1,0 +1,30 @@
+/**
+ * 心犀AI - TypeScript 主配置
+ * ===========================
+ *
+ * 【学习要点】
+ * tsconfig.json 是 TypeScript 编译器的配置文件。
+ * - "files: []" + "references" 是"项目引用"模式，适合前后端分离项目
+ * - 实际编译选项在 tsconfig.app.json 中（应用代码）和 tsconfig.node.json 中（Node.js 脚本）
+ * - 这种拆分方式让 Vite 配置和应用代码使用不同的 TS 规则
+ */
+{
+  "files": [],
+  "references": [
+    { "path": "./tsconfig.app.json" },
+    { "path": "./tsconfig.node.json" }
+  ],
+  "compilerOptions": {
+    /* 
+     * "paths" 让 TypeScript 理解 @/ 路径别名
+     * 比如 import { Button } from "@/components/ui/button"
+     * 实际指向 ./src/components/ui/button
+     *
+     * 注意：Vite 也需要在 vite.config.ts 中配置 resolve.alias，两边要一致
+     */
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  }
+}
