@@ -36,6 +36,9 @@ export default function Navbar() {
           <NavLink to="/history" className={linkClass}>
             📋 历史
           </NavLink>
+          <NavLink to="/profile/F002" className={linkClass}>
+            👤 我的
+          </NavLink>
         </div>
       </div>
     </nav>

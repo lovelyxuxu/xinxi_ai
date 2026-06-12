@@ -8,6 +8,7 @@ import Home from './pages/Home'
 import UserDetail from './pages/UserDetail'
 import CreateUser from './pages/CreateUser'
 import MatchHistory from './pages/MatchHistory'
+import Profile from './pages/Profile'
 
 export default function App() {
   return (
@@ -19,6 +20,7 @@ export default function App() {
           <Route path="/user/:userId" element={<UserDetail />} />
           <Route path="/create" element={<CreateUser />} />
           <Route path="/history" element={<MatchHistory />} />
+          <Route path="/profile/:userId" element={<Profile />} />
         </Routes>
       </main>
       {/* 页脚 */}
