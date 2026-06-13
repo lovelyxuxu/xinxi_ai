@@ -70,14 +70,16 @@ _judge_prompt = ChatPromptTemplate.from_messages([
 _JUDGE_JSON_SCHEMA = """```json
 {
   "overall_score": 整体评分(1-10),
-  "relevance": 相关性评分(1-10),
-  "compatibility": 契合度评分(1-10),
-  "explanation": 解释力评分(1-10),
-  "consistency": 一致性评分(1-10),
-  "warmth": 温度感评分(1-10),
-  "strengths": "匹配结果的优点（1-2句话）",
-  "weaknesses": "匹配结果的不足（1-2句话）",
-  "suggestions": "改进建议（1-2句话）"
+  "dimensions": [
+    {"dimension": "相关性", "score": 评分(1-10), "comment": "该维度的简要评价"},
+    {"dimension": "契合度", "score": 评分(1-10), "comment": "该维度的简要评价"},
+    {"dimension": "解释力", "score": 评分(1-10), "comment": "该维度的简要评价"},
+    {"dimension": "一致性", "score": 评分(1-10), "comment": "该维度的简要评价"},
+    {"dimension": "温度感", "score": 评分(1-10), "comment": "该维度的简要评价"}
+  ],
+  "strengths": "匹配结果的主要优点（1-2句话）",
+  "weaknesses": "匹配结果的主要不足（1-2句话）",
+  "suggestion": "改进建议（1-2句话）"
 }
 ```"""
 

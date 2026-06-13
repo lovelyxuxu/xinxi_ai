@@ -144,9 +144,8 @@ def trigger_match(body: MatchRequest, svc: AppServices = Depends(get_services)):
     result_data = _build_final_result(final_state, body.user_id)
     result = MatchResult(**result_data)
 
-    if body.user_id not in svc.match_history:
-        svc.match_history[body.user_id] = []
-    svc.match_history[body.user_id].append(result.model_dump())
+    # 持久化到内存 + SQLite（双写，确保重启不丢失）
+    svc.save_match_record(body.user_id, result.model_dump())
 
     return result
 
@@ -309,10 +308,8 @@ async def ws_match(websocket: WebSocket, user_id: str):
         "result": result_data,
     })
 
-    # 7. 存入历史
-    if user_id not in svc.match_history:
-        svc.match_history[user_id] = []
-    svc.match_history[user_id].append(result_data)
+    # 7. 持久化到内存 + SQLite（双写）
+    svc.save_match_record(user_id, result_data)
 
     await websocket.close()
 
@@ -367,8 +364,19 @@ def get_match_history(
     user_id: str,
     svc: AppServices = Depends(get_services),
 ):
-    """获取指定用户的所有匹配历史记录（按时间倒序）"""
+    """
+    获取指定用户的所有匹配历史记录（按时间倒序）。
+
+    学习要点：
+    - 优先从内存 dict 读取（最快）
+    - 内存为空时从 SQLite 回退读取（确保重启后仍有数据）
+    """
     records = svc.match_history.get(user_id, [])
+
+    # 内存中没有记录时，从 SQLite 回退查询
+    if not records:
+        records = svc.history_store.get_by_user(user_id)
+
     sorted_records = sorted(records, key=lambda r: r.get("created_at", ""), reverse=True)
 
     return MatchHistoryResponse(
@@ -382,11 +390,23 @@ def get_match_history(
 # ============================================================
 @router.get("/{match_id}", response_model=MatchResult)
 def get_match_result(match_id: str, svc: AppServices = Depends(get_services)):
-    """根据 match_id 获取一次匹配的完整结果"""
+    """
+    根据 match_id 获取一次匹配的完整结果。
+
+    学习要点：
+    - 先从内存中遍历查找（O(n) 但数据量小，足够快）
+    - 找不到时从 SQLite 精确查询（O(1)，有 match_id 索引）
+    """
+    # 1. 优先从内存查找
     for user_id, records in svc.match_history.items():
         for record in records:
             if record.get("match_id") == match_id:
                 return MatchResult(**record)
+
+    # 2. 内存中找不到 → 从 SQLite 回退
+    record = svc.history_store.get_by_match_id(match_id)
+    if record:
+        return MatchResult(**record)
 
     raise HTTPException(status_code=404, detail=f"匹配记录 {match_id} 不存在")
 

@@ -286,20 +286,27 @@ def langfuse_report_scores(
         # 2. 上报各维度评分
         #    多维度分析帮助定位具体问题：
         #    比如"整体分高但温度感低"→ 需要优化推荐信的文案风格
-        dimension_names = {
-            "relevance": "相关性",       # 候选人是否符合择偶要求
-            "compatibility": "契合度",    # 性格、兴趣匹配程度
-            "explanation": "解释力",      # 匹配理由是否具体有说服力
-            "consistency": "一致性",      # 评分与理由是否自洽
-            "warmth": "温度感",           # 推荐信是否真诚温暖
+        #
+        #    【学习要点 — dimensions 列表结构】
+        #    MatchEvaluation 模型使用 dimensions 列表存储各维度评分：
+        #    [{"dimension": "相关性", "score": 8, "comment": "..."}, ...]
+        #    遍历列表，把每个维度的分数单独上报到 LangFuse。
+        dimension_name_map = {
+            "相关性": "relevance",       # 候选人是否符合择偶要求
+            "契合度": "compatibility",    # 性格、兴趣匹配程度
+            "解释力": "explanation",      # 匹配理由是否具体有说服力
+            "一致性": "consistency",      # 评分与理由是否自洽
+            "温度感": "warmth",           # 推荐信是否真诚温暖
         }
 
-        for key, cn_name in dimension_names.items():
-            score_value = evaluation.get(key)
+        for dim in evaluation.get("dimensions", []):
+            cn_name = dim.get("dimension", "")
+            en_key = dimension_name_map.get(cn_name, cn_name)
+            score_value = dim.get("score")
             if score_value is not None:
                 client.create_score(
                     trace_id=trace_id,
-                    name=f"dim_{key}",            # 用英文 key 作为指标名（便于程序处理）
+                    name=f"dim_{en_key}",         # 用英文 key 作为指标名（便于程序处理）
                     value=score_value,
                     comment=f"{cn_name}评分",       # 中文描述（便于人工查看）
                 )

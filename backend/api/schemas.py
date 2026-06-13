@@ -44,6 +44,11 @@ class UserCreate(BaseModel):
     hobbies: str = Field(default="", description="兴趣爱好，逗号分隔")
     mbti: str = Field(default="未知", description="MBTI 性格类型")
 
+    # v2: 认证字段
+    password: str = Field(description="密码（至少6位）", min_length=6)
+    email: Optional[str] = Field(default=None, description="邮箱（可选）")
+    phone: Optional[str] = Field(default=None, description="手机号（可选）")
+
 
 class UserUpdate(BaseModel):
     """
@@ -90,12 +95,49 @@ class UserResponse(BaseModel):
     ideal_partner: str
     hobbies: str
     mbti: str
+    height_cm: Optional[int] = None
+    avatar_url: Optional[str] = None
+    photos: list[str] = []
     created_at: Optional[str] = None
+
+    # v2: 认证 Token（仅注册/登录时返回）
+    access_token: Optional[str] = None
+    refresh_token: Optional[str] = None
+
+
+class UserPublicResponse(BaseModel):
+    """
+    用户公开主页响应。
+
+    学习要点：
+    - 公开信息不包含 target_* 择偶偏好、邮箱、手机等私密字段
+    - 任何人（含未登录用户）都能访问用户公开主页
+    - 与 UserResponse（登录用户自己的完整信息）区分开
+    """
+    user_id: str
+    nickname: str
+    gender: str
+    age: int
+    city: str
+    province: str
+    education: str
+    annual_income: str
+    marital_status: str
+    mbti: str
+    height_cm: Optional[int] = None
+    about_me: str = ""
+    hobbies: str = ""
+    avatar_url: Optional[str] = None
+    photos: list[str] = []
+    created_at: Optional[str] = None
+    follower_count: int = 0
+    following_count: int = 0
+    match_count: int = 0
 
 
 class UserListResponse(BaseModel):
     """用户列表响应（带分页）"""
-    users: list[UserResponse]
+    users: list[UserPublicResponse]
     total: int
     page: int
     page_size: int
@@ -137,6 +179,12 @@ class MatchHistoryResponse(BaseModel):
 # ============================================================
 # 通用响应
 # ============================================================
+
+class PhotoUploadResponse(BaseModel):
+    """图片上传响应"""
+    url: str = Field(description="图片访问 URL")
+    photos: list[str] = Field(description="更新后的照片列表")
+
 
 class MessageResponse(BaseModel):
     """通用消息响应"""

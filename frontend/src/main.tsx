@@ -1,15 +1,20 @@
 /**
- * 心犀AI - 应用入口
- * ==================
+ * 心犀AI - 应用入口（v2 认证版）
+ * ==================================
  *
- * 【学习要点】
- * - StrictMode：React 的开发模式辅助工具，会重复渲染组件来检测副作用问题
- * - BrowserRouter：react-router-dom 的路由容器，提供 URL 同步能力
- * - 注意 import 路径从 '.jsx' 变成了不带扩展名（TypeScript 会自动解析 .tsx）
+ * 【学习要点 — Provider 嵌套顺序】
+ * React 的 Provider 需要从外到内嵌套，顺序很重要：
+ * 1. BrowserRouter — 提供路由上下文（URL 同步）
+ * 2. AuthProvider — 提供认证上下文（依赖路由的 useLocation）
+ * 3. App — 应用主体
+ *
+ * 如果顺序反了（AuthProvider 在 BrowserRouter 外面），
+ * AuthProvider 内部使用 useNavigate 等 Hook 会报错。
  */
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
+import { AuthProvider } from './contexts/AuthContext'
 import App from './App'
 import './index.css'
 
@@ -21,7 +26,9 @@ import './index.css'
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>
-      <App />
+      <AuthProvider>
+        <App />
+      </AuthProvider>
     </BrowserRouter>
   </StrictMode>,
 )

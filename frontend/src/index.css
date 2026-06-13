@@ -1,161 +1,98 @@
 /**
- * 心犀AI - 全局样式（Tailwind v4 + shadcn/ui 主题系统）
- * ======================================================
+ * 心犀AI v3 — 暗色主题设计系统（Tailwind v4 + shadcn/ui）
+ * ============================================================
  *
- * 【学习要点 — 这个文件是整个 UI 主题的核心】
+ * 【学习要点 — Tailwind v4 与 v3 的主要区别】
+ * v4 不再使用 tailwind.config.js，所有主题配置都在 CSS 文件中完成：
+ * - @import "tailwindcss"：替代 @tailwind base/components/utilities
+ * - @theme inline：把 CSS 变量映射到 Tailwind 工具类
+ * - 直接在 :root 中定义 CSS 变量，组件通过 var(--xxx) 引用
  *
- * shadcn/ui 的主题系统基于 CSS 自定义属性（CSS Variables）：
- * - 每个颜色都有一个 "亮色" 和 "暗色" 版本
- * - 组件通过引用这些变量来设置颜色，而不是硬编码
- * - 切换主题只需改变变量的值
- *
- * Tailwind v4 的 @theme inline 指令：
- * - 把 CSS 变量映射到 Tailwind 的设计令牌（design tokens）
- * - 这样就能在 class 中使用：bg-primary, text-foreground 等
- * - 比 v3 的 tailwind.config.js 更直观
- *
- * 色彩方案设计（心犀AI 粉色主题）：
- * - --primary: rose-500 (#f43f5e) — 主色调，用于按钮、链接、强调
- * - --background: 白色系 — 页面背景
- * - --card: 白色 — 卡片背景
- * - --muted: 浅灰 — 次要文本和背景
- * - --accent: 粉色系 — 辅助强调色
+ * 【设计语言】
+ * 暗色渐变 + 磨砂玻璃 + 小红书/Soul 风格
+ * - 主背景：深空黑（#0a0a0f）
+ * - 主色调：玫红 (#e91e8c) → 紫 (#9c27b0) 渐变
+ * - 卡片：rgba 磨砂玻璃效果（backdrop-filter: blur）
  */
 
-/* Tailwind v4 入口 — 导入所有 Tailwind 基础样式和工具类 */
+/* Tailwind v4 入口 */
 @import "tailwindcss";
 
-/* shadcn/ui 动画库 — 提供 enter/exit 动画的 CSS 关键帧 */
+/* shadcn/ui 动画库 */
 @import "tw-animate-css";
 
 /* ============================================================
-   CSS 自定义属性 — 亮色主题
+   CSS 变量 — 暗色主题（全局激活，不需要 .dark 类）
    ============================================================
-   
-   【学习要点】
-   :root 选择器匹配文档的根元素（<html>），在这里定义的变量是全局的。
-   变量名遵循 shadcn/ui 的约定：
-   - --background / --foreground：背景和前景色
-   - --primary / --primary-foreground：主色调和主色调上的文字色
-   - --card / --card-foreground：卡片背景和卡片文字
-   - --radius：全局圆角大小（影响所有组件的圆角）
-   
-   颜色格式使用 HSL（色相、饱和度、亮度），这样更容易理解：
-   - hsl(350, 89%, 60%) = 偏红色的玫瑰色
-   - 第一个值是色相（0-360 度），350 接近红色
+   颜色格式: oklch(亮度 色度 色相)
+   - 亮度 0=黑, 1=白
+   - 色度 0=无色, 越大越鲜艳
+   - 色相 0-360 度
 */
 @layer base {
   :root {
-    /* 背景色 — 纯白 */
-    --background: oklch(1 0 0);
-    /* 前景色（正文文字）— 深灰 */
-    --foreground: oklch(0.145 0 0);
-    
-    /* 卡片背景 — 纯白 */
-    --card: oklch(1 0 0);
-    --card-foreground: oklch(0.145 0 0);
-    
-    /* 弹出层背景 */
-    --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.145 0 0);
-    
-    /* 
-     * 主色调 — 心犀AI 的玫瑰红（rose-500 约 #f43f5e）
-     * 这是整个应用最重要的颜色，用于按钮、链接、强调元素
-     * oklch(0.645 0.246 16.44) ≈ 玫瑰红
-     */
-    --primary: oklch(0.645 0.246 16.44);
-    /* 主色调上的文字 — 白色 */
-    --primary-foreground: oklch(0.985 0 0);
-    
-    /* 次要颜色 — 浅灰，用于次要按钮和背景 */
-    --secondary: oklch(0.97 0 0);
-    --secondary-foreground: oklch(0.205 0 0);
-    
-    /* 弱化颜色 — 更浅的灰色，用于禁用状态、标签等 */
-    --muted: oklch(0.97 0 0);
-    --muted-foreground: oklch(0.556 0 0);
-    
-    /* 强调色 — 浅粉色（rose-100 约 #ffe4e6） */
-    --accent: oklch(0.955 0.025 16.44);
-    --accent-foreground: oklch(0.355 0.15 16.44);
-    
-    /* 危险色 — 红色，用于错误和删除操作 */
+    /* === 背景 === */
+    --background: oklch(0.08 0.01 270);       /* 深空黑 #0a0a0f */
+    --foreground: oklch(0.94 0.005 270);      /* 主文字 #f0f0f5 */
+
+    /* === 卡片 === */
+    --card: oklch(0.12 0.01 270);             /* 卡片背景 #131318 */
+    --card-foreground: oklch(0.94 0.005 270);
+
+    /* === Popover（下拉菜单） === */
+    --popover: oklch(0.14 0.01 270);
+    --popover-foreground: oklch(0.94 0.005 270);
+
+    /* === 主色调：玫红 === */
+    --primary: oklch(0.55 0.23 340);          /* #e91e8c 玫红 */
+    --primary-foreground: oklch(1 0 0);
+
+    /* === 次要色：紫 === */
+    --secondary: oklch(0.45 0.2 295);         /* #9c27b0 紫色 */
+    --secondary-foreground: oklch(1 0 0);
+
+    /* === 低调/辅助 === */
+    --muted: oklch(0.18 0.01 270);            /* 暗灰 #2a2a30 */
+    --muted-foreground: oklch(0.55 0.01 270); /* 辅助文字 #8b8b9e */
+
+    /* === 强调（角标、高亮） === */
+    --accent: oklch(0.65 0.22 340);           /* 亮粉 #ff6b9d */
+    --accent-foreground: oklch(1 0 0);
+
+    /* === 危险/错误 === */
     --destructive: oklch(0.577 0.245 27.325);
-    
-    /* 边框颜色 — 浅玫瑰灰 */
-    --border: oklch(0.94 0.008 16.44);
-    /* 输入框边框 */
-    --input: oklch(0.94 0.008 16.44);
-    /* 聚焦环颜色 */
-    --ring: oklch(0.645 0.246 16.44);
-    
-    /* 图表颜色（5 种，用于数据可视化） */
-    --chart-1: oklch(0.645 0.246 16.44);
+    --destructive-foreground: oklch(1 0 0);
+
+    /* === 边框和输入框 === */
+    --border: oklch(0.22 0.01 270);           /* 细边框 */
+    --input: oklch(0.18 0.01 270);
+    --ring: oklch(0.55 0.23 340);             /* 焦点环，用主色 */
+
+    /* === 圆角 === */
+    --radius: 0.75rem;
+
+    /* === 图表颜色 === */
+    --chart-1: oklch(0.55 0.23 340);
     --chart-2: oklch(0.55 0.2 160);
     --chart-3: oklch(0.45 0.15 40);
     --chart-4: oklch(0.65 0.22 60);
     --chart-5: oklch(0.7 0.25 30);
-    
-    /* 侧边栏颜色 */
-    --sidebar: oklch(0.985 0 0);
-    --sidebar-foreground: oklch(0.145 0 0);
-    --sidebar-primary: oklch(0.645 0.246 16.44);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.955 0.025 16.44);
-    --sidebar-accent-foreground: oklch(0.355 0.15 16.44);
-    --sidebar-border: oklch(0.94 0.008 16.44);
-    --sidebar-ring: oklch(0.645 0.246 16.44);
-    
-    /* 全局圆角 — 0.75rem 约 12px，介于 rounded-lg 和 rounded-xl 之间 */
-    --radius: 0.75rem;
-  }
 
-  /* 暗色主题（预留，目前不启用，但保留结构方便以后切换） */
-  .dark {
-    --background: oklch(0.145 0 0);
-    --foreground: oklch(0.985 0 0);
-    --card: oklch(0.205 0 0);
-    --card-foreground: oklch(0.985 0 0);
-    --popover: oklch(0.205 0 0);
-    --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.705 0.213 16.44);
-    --primary-foreground: oklch(0.205 0 0);
-    --secondary: oklch(0.269 0 0);
-    --secondary-foreground: oklch(0.985 0 0);
-    --muted: oklch(0.269 0 0);
-    --muted-foreground: oklch(0.708 0 0);
-    --accent: oklch(0.269 0 0);
-    --accent-foreground: oklch(0.985 0 0);
-    --destructive: oklch(0.577 0.245 27.325);
-    --border: oklch(0.269 0 0);
-    --input: oklch(0.269 0 0);
-    --ring: oklch(0.556 0.18 16.44);
-    --chart-1: oklch(0.55 0.2 200);
-    --chart-2: oklch(0.6 0.22 160);
-    --chart-3: oklch(0.7 0.25 30);
-    --chart-4: oklch(0.6 0.28 280);
-    --chart-5: oklch(0.7 0.26 340);
-    --sidebar: oklch(0.205 0 0);
-    --sidebar-foreground: oklch(0.985 0 0);
-    --sidebar-primary: oklch(0.705 0.213 16.44);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.269 0 0);
-    --sidebar-accent-foreground: oklch(0.985 0 0);
-    --sidebar-border: oklch(0.269 0 0);
-    --sidebar-ring: oklch(0.556 0.18 16.44);
+    /* === 侧边栏 === */
+    --sidebar: oklch(0.12 0.01 270);
+    --sidebar-foreground: oklch(0.94 0.005 270);
+    --sidebar-primary: oklch(0.55 0.23 340);
+    --sidebar-primary-foreground: oklch(1 0 0);
+    --sidebar-accent: oklch(0.18 0.01 270);
+    --sidebar-accent-foreground: oklch(0.94 0.005 270);
+    --sidebar-border: oklch(0.22 0.01 270);
+    --sidebar-ring: oklch(0.55 0.23 340);
   }
 }
 
 /* ============================================================
    Tailwind v4 主题映射
-   
-   【学习要点】
-   @theme inline 是 Tailwind v4 的新指令：
-   - 把 CSS 变量映射到 Tailwind 的颜色系统
-   - inline 表示直接替换而不是生成色阶
-   - 映射后，就能使用 bg-background、text-foreground、bg-primary 等类名
-   - shadcn/ui 的组件都通过这些语义化的类名来设置颜色
+   把 CSS 变量绑定到 Tailwind 工具类
    ============================================================ */
 @theme inline {
   --color-background: var(--background);
@@ -173,6 +110,7 @@
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
@@ -195,38 +133,31 @@
   --radius-xl: calc(var(--radius) + 4px);
   --radius-2xl: calc(var(--radius) + 8px);
 
-  /* 保留原有的自定义颜色（rose, pink, warm 系列） */
-  --color-rose-50: #fff1f2;
-  --color-rose-100: #ffe4e6;
-  --color-rose-200: #fecdd3;
-  --color-rose-300: #fda4af;
-  --color-rose-400: #fb7185;
+  /* 保留常用颜色直接访问 */
   --color-rose-500: #f43f5e;
-  --color-rose-600: #e11d48;
-  --color-rose-700: #be123c;
-  --color-warm-50: #fff7ed;
-  --color-warm-100: #ffedd5;
-  --color-warm-200: #fed7aa;
-  --color-warm-400: #fb923c;
-  --color-warm-500: #f97316;
-  --color-pink-50: #fdf2f8;
-  --color-pink-100: #fce7f3;
-  --color-pink-200: #fbcfe8;
-  --color-pink-400: #f472b6;
   --color-pink-500: #ec4899;
 }
 
 /* ============================================================
    全局基础样式
    ============================================================ */
+* {
+  border-color: var(--border);
+}
+
 body {
   margin: 0;
-  font-family: 'PingFang SC', 'Microsoft YaHei', -apple-system, sans-serif;
-  /* 柔和的粉紫橙渐变背景 — 心犀AI 的标志性视觉 */
-  background: linear-gradient(135deg, #fff1f2 0%, #fdf2f8 50%, #fff7ed 100%);
-  min-height: 100vh;
-  /* 使用 shadcn/ui 的文本颜色 */
+  background-color: oklch(0.08 0.01 270);
   color: var(--foreground);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+  /* 全局背景：两个光晕渐变叠加，产生深邃的宇宙感 */
+  background-image:
+    radial-gradient(ellipse 80% 50% at 20% -10%, rgba(233,30,140,0.12) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 40% at 85% 90%, rgba(156,39,176,0.10) 0%, transparent 60%);
+  background-attachment: fixed;
 }
 
 #root {
@@ -236,39 +167,99 @@ body {
 }
 
 /* ============================================================
-   自定义动画和效果
-   
+   磨砂玻璃卡片效果
    【学习要点】
-   这些是项目特有的动画效果，shadcn/ui 的 tw-animate-css 不包含它们。
-   保留这些自定义动画，同时享受 shadcn 组件内置的过渡动画。
+   backdrop-filter: blur() — 让元素背后的内容模糊，产生磨砂感
+   需要父元素有可见背景，这里 body 的渐变背景提供了"底色"
+   -webkit-backdrop-filter: blur() — 兼容 Safari（iOS 必须）
    ============================================================ */
-
-/* 卡片悬浮效果 — translateY + 玫瑰色阴影 */
-.card-hover {
-  transition: transform 0.25s ease, box-shadow 0.25s ease;
-}
-.card-hover:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 12px 28px rgba(244, 63, 94, 0.15);
+.glass-card {
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius);
 }
 
-/* 按钮按压反馈 */
-.btn-press:active { transform: scale(0.97); }
+/* 带品牌色光晕边框的磨砂卡片（用于重点卡片、表单等） */
+.glass-card-glow {
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(233, 30, 140, 0.2);
+  border-radius: var(--radius);
+  box-shadow:
+    0 0 30px rgba(233, 30, 140, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
 
-/* 慢速旋转（用于加载指示器） */
-@keyframes spin-slow { to { transform: rotate(360deg); } }
-.animate-spin-slow { animation: spin-slow 1.5s linear infinite; }
+/* ============================================================
+   渐变文字（Logo、标题用）
+   ============================================================ */
+.gradient-text {
+  background: linear-gradient(135deg, #e91e8c 0%, #9c27b0 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
 
-/* 心跳效果（用于 Logo 和加载状态） */
+/* ============================================================
+   主渐变背景（用于主按钮、凸起 FAB 等）
+   bg-gradient-primary 会通过 @theme 注册，这里作为补充
+   ============================================================ */
+.bg-gradient-primary {
+  background: linear-gradient(135deg, #e91e8c 0%, #9c27b0 100%);
+}
+
+/* ============================================================
+   移动端安全区域（底部导航适配 iPhone Home 指示条）
+   env(safe-area-inset-bottom) — 获取 iOS 底部安全区域高度
+   ============================================================ */
+.pb-safe {
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), 8px);
+}
+
+/* ============================================================
+   滚动条美化（暗色主题配套）
+   ============================================================ */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--muted);
+  border-radius: 2px;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--muted-foreground); }
+
+/* ============================================================
+   动画关键帧
+   ============================================================ */
 @keyframes heartbeat {
   0%, 100% { transform: scale(1); }
   50% { transform: scale(1.15); }
 }
 .animate-heartbeat { animation: heartbeat 1.2s ease-in-out infinite; }
 
-/* 渐入上移（用于卡片出现动画） */
 @keyframes fade-in-up {
   from { opacity: 0; transform: translateY(16px); }
   to { opacity: 1; transform: translateY(0); }
 }
-.animate-fade-in-up { animation: fade-in-up 0.4s ease forwards; }
+.animate-fade-in-up { animation: fade-in-up 0.3s ease forwards; }
+
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-slide-up { animation: slide-up 0.2s ease-out forwards; }
+
+/* 按钮按压反馈 */
+.btn-press:active { transform: scale(0.97); }
+
+/* 暗色表单输入框样式（通用类，供 EditProfile 等页面使用） */
+.input-dark {
+  background: var(--muted) !important;
+  border-color: var(--border) !important;
+  color: var(--foreground) !important;
+}
+.input-dark::placeholder {
+  color: var(--muted-foreground) !important;
+}

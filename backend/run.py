@@ -1,26 +1,25 @@
 """
-心犀AI - API 服务启动入口
-==========================
-启动 FastAPI 服务，提供 HTTP 接口。
+XinXi AI - API Server Entry Point
+==================================
 
-使用方式：
-    python run.py                  # 默认 8000 端口
-    python run.py --port 8080      # 指定端口
-    python run.py --reload         # 开发模式（文件修改后自动重启）
+Usage:
+    python run.py                  # Default port 8000
+    python run.py --port 8080      # Custom port
+    python run.py --reload         # Dev mode (auto-restart on file changes)
 
-启动后访问：
-    http://localhost:8000/docs     # Swagger API 文档（自动生成！）
-    http://localhost:8000/redoc    # ReDoc 格式的 API 文档
+After startup:
+    http://localhost:8000/docs     # Swagger API docs
+    http://localhost:8000/redoc    # ReDoc docs
 """
 
 import sys
 import os
 import argparse
 
-# 确保项目根目录在 Python 路径中
+# Ensure project root is in Python path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-# Windows 编码修复
+# Windows encoding fix
 if sys.platform == "win32":
     try:
         os.system("chcp 65001 >nul 2>&1")
@@ -29,28 +28,61 @@ if sys.platform == "win32":
 
 
 def main():
-    parser = argparse.ArgumentParser(description="心犀AI API 服务")
-    parser.add_argument("--host", type=str, default="127.0.0.1", help="监听地址")
-    parser.add_argument("--port", type=int, default=8000, help="监听端口")
-    parser.add_argument("--reload", action="store_true", help="开发模式：文件修改后自动重启")
+    parser = argparse.ArgumentParser(description="XinXi AI API Server")
+    parser.add_argument("--host", type=str, default="127.0.0.1", help="Listen address")
+    parser.add_argument("--port", type=int, default=8000, help="Listen port")
+    parser.add_argument("--reload", action="store_true", help="Dev mode: auto-restart on changes")
     args = parser.parse_args()
 
     print()
     print("=" * 55)
-    print("  心犀AI API Server")
+    print("  XinXi AI API Server")
     print(f"  http://{args.host}:{args.port}")
     print(f"  API Docs: http://{args.host}:{args.port}/docs")
     print("=" * 55)
     print()
 
+    # ================================================================
+    # Windows Event Loop Fix for psycopg3
+    # ================================================================
+    # psycopg3 (PostgreSQL async driver) is NOT compatible with
+    # ProactorEventLoop on Windows. We must use SelectorEventLoop.
+    #
+    # uvicorn.run() internally calls asyncio.run(), which on Windows
+    # creates a ProactorEventLoop. To fix this, we:
+    # 1. Set the event loop policy to WindowsSelectorEventLoopPolicy
+    # 2. Use uvicorn.Config + uvicorn.Server directly for full control
+    # 3. Manually create and set a SelectorEventLoop before server.run()
+    if sys.platform == "win32":
+        import asyncio
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
     import uvicorn
-    uvicorn.run(
-        "api.app:create_app",
+
+    config = uvicorn.Config(
+        app="api.app:create_app",
         factory=True,
         host=args.host,
         port=args.port,
         reload=args.reload,
+        log_level="info",
     )
+
+    server = uvicorn.Server(config)
+
+    if sys.platform == "win32":
+        # On Windows, create a SelectorEventLoop explicitly
+        # and set it as the current loop before starting the server
+        import asyncio
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            loop.run_until_complete(server.serve())
+        finally:
+            loop.close()
+    else:
+        # On macOS/Linux, uvicorn's default loop handling works fine
+        server.run()
 
 
 if __name__ == "__main__":

@@ -15,12 +15,11 @@ Phase 5 多 Agent 子图：
   下次连接时，可以从 checkpoint 恢复上次对话的状态继续。
 
 注意：
-  由于 SqliteSaver 不支持 async 方法，这里使用同步 invoke 而非 ainvoke。
-  LangGraph 的 invoke 在 async 函数中也能正常使用（只是会阻塞事件循环）。
-  对于学习项目来说这完全足够，生产环境建议换用 AsyncSqliteSaver。
+  由于使用 AsyncSqliteSaver（异步 SQLite 检查点），
+  所有图操作都使用异步接口（aget_state, ainvoke）。
+  这避免了"同步调用不允许"的错误，也不会阻塞事件循环。
 """
 
-import asyncio
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException
 from langchain_core.messages import HumanMessage, AIMessage
 
@@ -72,7 +71,12 @@ async def ws_interview(websocket: WebSocket, user_id: str):
     if langfuse_handler:
         config["callbacks"] = [langfuse_handler]
 
-    state = svc.interview_graph.get_state(config)
+    # 【学习要点 — 异步接口】
+    # AsyncSqliteSaver 要求所有操作都使用异步接口（aget_state, ainvoke）。
+    # 如果在主线程中使用同步接口（get_state, invoke），会抛出：
+    # "Synchronous calls to AsyncSqliteSaver are only allowed from a different thread"
+    # 所以这里用 await + aget_state / ainvoke。
+    state = await svc.interview_graph.aget_state(config)
 
     if not state.values:
         # 第一次进入，初始化
@@ -83,13 +87,8 @@ async def ws_interview(websocket: WebSocket, user_id: str):
             "is_complete": False,
             "user_id": user_id
         }
-        # 使用同步 invoke（兼容 SqliteSaver）
-        # 在线程池中运行以避免阻塞事件循环
-        loop = asyncio.get_event_loop()
-        result = await loop.run_in_executor(
-            None,
-            lambda: svc.interview_graph.invoke(initial_state, config=config)
-        )
+        # 使用 ainvoke（异步版本）直接调用，不需要 run_in_executor
+        result = await svc.interview_graph.ainvoke(initial_state, config=config)
 
         # 发送 AI 的第一个问题
         if result["messages"]:
@@ -113,14 +112,10 @@ async def ws_interview(websocket: WebSocket, user_id: str):
             user_msg = HumanMessage(content=data)
 
             # 运行图：parse_answer（解析回复）→ generate_question（生成新问题）
-            # 使用 run_in_executor 避免阻塞事件循环
-            loop = asyncio.get_event_loop()
-            result = await loop.run_in_executor(
-                None,
-                lambda: svc.interview_graph.invoke(
-                    {"messages": [user_msg]},
-                    config=config
-                )
+            # 使用 ainvoke（异步版本）直接调用
+            result = await svc.interview_graph.ainvoke(
+                {"messages": [user_msg]},
+                config=config
             )
 
             # 发送 AI 回复

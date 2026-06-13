@@ -39,6 +39,7 @@ from langgraph.checkpoint.memory import MemorySaver
 
 from core.embedding.embedding_service import EmbeddingService
 from core.database.chroma_store import ChromaStore
+from core.database.history_store import HistoryStore
 from core.retrieval.hybrid_retriever import HybridRetriever
 
 # 导入新旧两种图构建器
@@ -52,6 +53,7 @@ from data.mock_data import get_mock_users
 # Phase 4: True = 使用 AsyncSqliteSaver（持久化到磁盘）, False = 使用 MemorySaver（纯内存）
 USE_SQLITE = True
 SQLITE_DB_PATH = Path(__file__).parent.parent / "data" / "checkpoints.db"
+HISTORY_DB_PATH = Path(__file__).parent.parent / "data" / "history.db"
 
 
 class AppServices:
@@ -84,9 +86,14 @@ class AppServices:
             checkpointer=self.checkpointer
         )
 
-        # 2. 内存存储（后续可替换为数据库）
+        # 2. 内存存储（匹配历史从 SQLite 加载，实现持久化）
         self.user_meta: dict[str, dict] = {}
-        self.match_history: dict[str, list[dict]] = {}
+        self.history_store = HistoryStore(HISTORY_DB_PATH)
+        # 从 SQLite 恢复历史数据到内存（兼容现有代码）
+        self.match_history: dict[str, list[dict]] = self.history_store.get_all_index()
+        if self.match_history:
+            total = sum(len(v) for v in self.match_history.values())
+            print(f"  [HistoryStore] 从 SQLite 恢复了 {total} 条匹配记录")
 
         # 3. 导入模拟数据（如果数据库为空）
         if self.chroma_store.get_user_count() == 0:
@@ -133,6 +140,23 @@ class AppServices:
             print(f"  [Phase 4] AsyncSqliteSaver initialized at {SQLITE_DB_PATH}")
         else:
             print("  [Phase 4] MemorySaver initialized (in-memory, volatile)")
+
+    def save_match_record(self, user_id: str, record: dict):
+        """
+        保存匹配记录到内存 + SQLite（双写）。
+
+        学习要点：
+        - 内存 dict 保持向后兼容（现有代码直接读 svc.match_history）
+        - SQLite 确保持久化（服务重启不丢失）
+        - 这种"双写"模式是渐进式迁移的常见策略
+        """
+        # 1. 写入内存
+        if user_id not in self.match_history:
+            self.match_history[user_id] = []
+        self.match_history[user_id].append(record)
+
+        # 2. 持久化到 SQLite
+        self.history_store.save(record)
 
     def _load_mock_data(self):
         """加载模拟数据到 Chroma 数据库"""

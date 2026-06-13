@@ -174,10 +174,35 @@ export interface ChatMessage {
 // ============================================================
 
 /**
+ * 用户公开主页（发现页/公开资料，不含私密字段）
+ */
+export interface UserPublic {
+  user_id: string
+  nickname: string
+  gender: 'male' | 'female'
+  age: number
+  city: string
+  province: string
+  education: string
+  annual_income: string
+  marital_status: string
+  mbti: string
+  height_cm?: number | null
+  about_me: string
+  hobbies: string
+  avatar_url?: string | null
+  photos: string[]
+  created_at?: string
+  follower_count: number
+  following_count: number
+  match_count: number
+}
+
+/**
  * 用户列表 API 响应
  */
 export interface UserListResponse {
-  users: UserProfile[]  // 用户列表
+  users: UserPublic[]   // 公开用户列表
   total: number         // 总数（用于分页）
   page: number          // 当前页码
   page_size: number     // 每页数量
@@ -198,4 +223,58 @@ export interface MessageResponse {
   message: string
   success: boolean
   data?: Record<string, unknown>  // 可选的附加数据
+}
+
+// ============================================================
+//  v2 认证相关类型
+// ============================================================
+
+/**
+ * 认证用户 — 登录/注册后返回的完整用户信息
+ *
+ * 【学习要点】
+ * 继承 UserProfile 的所有字段，额外加上 JWT Token 字段。
+ * 注册和登录接口会同时返回 access_token 和 refresh_token，
+ * 前端存储后在后续请求的 Authorization 头中带上。
+ */
+export interface AuthUser extends UserProfile {
+  access_token?: string   // JWT 访问令牌（短期有效，2小时）
+  refresh_token?: string  // JWT 刷新令牌（长期有效，7天）
+  height_cm?: number | null
+  avatar_url?: string | null
+  photos?: string[]       // 用户照片列表
+  // 择偶偏好扩展字段（v2 新增）
+  target_height_min?: number | null
+  target_height_max?: number | null
+  target_education?: string | null
+}
+
+/**
+ * 登录请求参数
+ */
+export interface LoginRequest {
+  account: string   // 邮箱或用户ID
+  password: string  // 密码
+}
+
+/**
+ * 注册请求参数
+ *
+ * 【学习要点】
+ * 扩展 UserCreate（= UserProfile 去掉 user_id 和 created_at），
+ * 加上认证相关字段：password（必填）、email 和 phone（可选）。
+ */
+export interface RegisterRequest extends UserCreate {
+  password: string          // 密码（至少6位）
+  email?: string            // 邮箱（可选）
+  phone?: string            // 手机号（可选）
+}
+
+/**
+ * Token 刷新响应
+ */
+export interface TokenRefreshResponse {
+  access_token: string
+  refresh_token: string
+  token_type: string
 }
