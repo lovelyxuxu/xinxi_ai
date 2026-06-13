@@ -86,6 +86,20 @@ def rule_based_router(state: SupervisorState) -> str:
                 # 已达最大重试次数，用当前结果生成推荐信
                 return "letter"
 
+    # --- 检索 Agent 刚执行完：进入 HITL 等待用户确认（Phase 3c 新增）---
+    # 学习要点：HITL 只在第一次检索后触发
+    # 如果是 reflection_agent 触发的重试（loop_count > 0），跳过 HITL 直接分析
+    # 因为用户已经确认过一次了，重试时不需要再次确认
+    if last_agent == "retrieval":
+        loop_count = state.get("loop_count", 0)
+        if loop_count > 0:
+            return "analysis"
+        return "hitl"
+
+    # --- HITL 节点完成后：进入深度分析（Phase 3c 新增）---
+    if last_agent == "hitl":
+        return "analysis"
+
     # --- 反思 Agent 刚执行完：去 retrieval 重试 ---
     if last_agent == "reflection":
         return "retrieval"
@@ -110,6 +124,7 @@ def rule_based_router(state: SupervisorState) -> str:
 AGENT_DESCRIPTIONS = {
     "intent": "意图解析：分析用户资料，提取硬性条件和语义搜索文本。通常只在流程开始时执行一次。",
     "retrieval": "混合检索：在向量数据库中搜索候选人。当需要首次检索或重试时使用。",
+    "hitl": "HITL 确认：向用户展示候选人预览，等待用户确认后继续深度分析。（Phase 3c 新增）",
     "analysis": "深度分析：用 LLM 对候选人进行交叉分析和评分。在检索后执行。",
     "reflection": "策略反思：分析匹配不佳的原因，调整搜索策略。在分析分数不达标时使用。",
     "letter": "推荐信生成：为高分候选人撰写温暖的推荐信。在分析满意后执行。",

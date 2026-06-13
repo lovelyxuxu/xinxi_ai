@@ -31,6 +31,7 @@ Supervisor 模式的图结构非常简单：
 import os
 from functools import partial
 from langgraph.graph import StateGraph, START, END
+from langgraph.types import interrupt
 
 from config.settings import match_config
 from core.agents.supervisor.state import SupervisorState
@@ -93,6 +94,87 @@ def _route_to_agent(state: SupervisorState) -> str:
     return state.get("next_agent", "FINISH")
 
 
+def _hitl_node(state: SupervisorState) -> dict:
+    """
+    HITL（Human-in-the-Loop）中断节点。
+
+    学习要点（重点！）：
+    ---------
+    1. interrupt(payload) 的工作原理：
+       - 调用时，LangGraph 立即暂停图的执行
+       - 当前完整的 State 被 Checkpointer 存储到 SQLite（thread_id 为 key）
+       - payload 被包装为 Interrupt 对象，通过
+         graph.get_state(config).tasks[0].interrupts 暴露给外部调用者
+       - 图处于 "suspended" 状态，等待外部 resume
+
+    2. Command(resume=value) 的工作原理：
+       - 外部调用 graph.ainvoke(Command(resume=value), config=config)
+       - LangGraph 从 Checkpointer 恢复 State
+       - interrupt() 调用点返回 value（即 Command 中的 resume 值）
+       - 图继续执行
+
+    3. 为什么需要 Checkpointer？
+       - 中断发生时，图需要知道从哪里恢复
+       - Checkpointer 保存了"当前执行到哪个节点"的快照
+       - 没有 Checkpointer 就无法实现 HITL（图不知道如何恢复）
+       - 本项目使用 AsyncSqliteSaver（已在 deps.py 中初始化）
+
+    数据流：
+      retrieval_agent 完成
+        → Supervisor 路由到 hitl_node
+        → hitl_node 调用 interrupt(候选人预览数据)
+        → 图暂停，外部可读取预览数据（通过 SSE 推送给前端）
+        → 用户点击"开始深度分析"
+        → 后端调用 Command(resume={"action": "proceed"})
+        → interrupt() 返回 {"action": "proceed"}
+        → hitl_node 完成，设置 next_agent="analysis"
+        → Supervisor 路由到 analysis_agent
+    """
+    candidates = state.get("candidates", [])
+    retrieval_note = state.get("retrieval_note", "")
+    messages = state.get("messages", [])
+    history = state.get("agent_history", [])
+
+    # 构建候选人预览数据（精简版，只包含前端需要展示的字段）
+    preview = []
+    for c in candidates[:8]:  # 最多展示 8 个候选人
+        preview.append({
+            "user_id": c.get("user_id", ""),
+            "nickname": c.get("nickname", ""),
+            "age": c.get("age", 0),
+            "city": c.get("city", ""),
+            "avatar_url": c.get("avatar_url", None),
+            "score": c.get("score", 0),
+        })
+
+    messages.append(
+        f"⏸ [HITL] 等待用户确认 {len(preview)} 位候选人预览..."
+    )
+
+    # 中断！向外暴露候选人预览数据，等待用户操作
+    # 学习要点：interrupt() 的参数会被序列化到 Checkpointer 中
+    # 外部通过 graph.aget_state(config).tasks[0].interrupts[0].value 读取
+    user_decision = interrupt({
+        "type": "hitl_preview",
+        "candidates": preview,
+        "retrieval_note": retrieval_note,
+        "candidate_count": len(candidates),
+    })
+
+    # 恢复执行（用户已点击"开始深度分析"）
+    messages.append(
+        f"▶ [HITL] 用户确认：{user_decision.get('action', 'proceed')}，开始深度分析"
+    )
+
+    return {
+        "hitl_decision": user_decision,
+        "messages": messages,
+        "next_agent": "analysis",  # HITL 完成后交给深度分析
+        "agent_history": history + ["hitl"],
+        "current_agent": "hitl",
+    }
+
+
 def build_supervisor_graph(retriever: HybridRetriever, checkpointer=None):
     """
     构建并编译 Supervisor 多 Agent 工作流。
@@ -123,6 +205,9 @@ def build_supervisor_graph(retriever: HybridRetriever, checkpointer=None):
     search_node = partial(retrieval_agent, retriever=retriever)
     graph.add_node("retrieval_agent", search_node)
 
+    # Phase 3c: HITL 节点（在 retrieval 完成后等待用户确认）
+    graph.add_node("hitl_node", _hitl_node)
+
     graph.add_node("analysis_agent", analysis_agent)
     graph.add_node("reflection_agent", reflection_agent)
     graph.add_node("letter_agent", letter_agent)
@@ -142,6 +227,7 @@ def build_supervisor_graph(retriever: HybridRetriever, checkpointer=None):
         {
             "intent": "intent_agent",
             "retrieval": "retrieval_agent",
+            "hitl": "hitl_node",        # Phase 3c: HITL 节点
             "analysis": "analysis_agent",
             "reflection": "reflection_agent",
             "letter": "letter_agent",
@@ -154,6 +240,7 @@ def build_supervisor_graph(retriever: HybridRetriever, checkpointer=None):
     # 这是 Supervisor 模式的关键设计：所有路径都经过调度中心
     graph.add_edge("intent_agent", "supervisor")
     graph.add_edge("retrieval_agent", "supervisor")
+    graph.add_edge("hitl_node", "supervisor")   # Phase 3c: HITL 完成后回到 Supervisor
     graph.add_edge("analysis_agent", "supervisor")
     graph.add_edge("reflection_agent", "supervisor")
     graph.add_edge("letter_agent", "supervisor")

@@ -30,6 +30,7 @@ from core.models.user_profile import UserProfile
 AgentName = Literal[
     "intent",       # 意图解析 Agent
     "retrieval",    # 混合检索 Agent
+    "hitl",         # HITL 中断节点（Phase 3c 新增）
     "analysis",     # 深度分析 Agent
     "reflection",   # 策略反思 Agent
     "letter",       # 推荐信生成 Agent
@@ -120,6 +121,25 @@ class SupervisorState(TypedDict, total=False):
     在图执行开始前生成，存入 State，供 Judge Agent 上报评分时使用。
     格式：match_{user_id}_{timestamp}
     如果 LangFuse 未启用，此字段为空字符串。
+    """
+
+    # === Phase 3c：Agentic RAG 检索信息 ===
+    retrieval_rounds: int
+    """实际执行的检索轮次（1-3），用于展示给用户"""
+
+    retrieval_note: str
+    """检索条件说明（如"已放宽年龄范围"），在 HITL 预览时展示给用户"""
+
+    # === Phase 3c：HITL（Human-in-the-Loop）===
+    hitl_decision: dict
+    """
+    用户在 HITL 中断点的决策，由 interrupt() 返回值填充。
+    格式：{"action": "proceed"}
+
+    学习要点：
+    - interrupt(payload) 的返回值来自外部的 Command(resume=value)
+    - 这就是 LangGraph HITL 的信息传递机制：
+      外部 → Command(resume=user_choice) → interrupt() 返回值 → state["hitl_decision"]
     """
 
     # === 调试信息 ===
