@@ -126,10 +126,18 @@ def create_langfuse_callback(
         from langfuse import Langfuse, get_client
         from langfuse.langchain import CallbackHandler
 
-        # 生成唯一的 trace_id
-        # 格式：match_{user_id}_{时间戳}，确保每次匹配都有独立的 trace
-        from datetime import datetime
-        trace_id = f"match_{user_id}_{datetime.now().strftime('%Y%m%d%H%M%S')}"
+        # 【学习要点 — trace_id 格式要求】
+        # Langfuse v4 基于 OpenTelemetry，要求 trace_id 必须是
+        # 32 位小写十六进制字符（W3C Trace Context 标准）。
+        # 例如: "a1b2c3d4e5f6789012345678abcdef01"
+        #
+        # 如果用自定义格式（如 "match_M002_20260613"），Langfuse 会报错：
+        # "Passed trace ID is not a valid 32 lowercase hex char Langfuse trace id"
+        # 导致 CallbackHandler 的每个事件都抛出 ValueError。
+        #
+        # 解决方案：用 uuid4().hex 生成标准格式的 trace_id。
+        import uuid
+        trace_id = uuid.uuid4().hex  # 32 位小写 hex，如 "a1b2c3d4..."
 
         # 【学习要点 — 全局客户端初始化】
         # Langfuse v4 使用"全局客户端"模式：
