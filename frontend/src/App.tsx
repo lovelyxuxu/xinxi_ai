@@ -25,6 +25,7 @@ import MyProfile from './pages/MyProfile'
 import EditProfile from './pages/EditProfile'
 import FateList from './pages/FateList'
 import FateAnalysis from './pages/FateAnalysis'
+import MatchCenter from './pages/MatchCenter'
 
 export default function App() {
   return (
@@ -61,7 +62,11 @@ export default function App() {
             <ProtectedRoute requireProfileComplete><FateAnalysis /></ProtectedRoute>
           } />
 
-          {/* Phase 4 将添加：/chat、/chat/:convId、/social */}
+          {/* Phase 3c: 匹配中心（SSE + HITL） */}
+          <Route path="/match" element={
+            <ProtectedRoute><MatchCenter /></ProtectedRoute>
+          } />
+
           {/* Phase 4 将添加：/chat、/chat/:convId、/social */}
           {/* Phase 5 将添加：/settings */}
         </Routes>

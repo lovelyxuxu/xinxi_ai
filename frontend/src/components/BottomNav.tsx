@@ -45,6 +45,13 @@ export default function BottomNav() {
           )}
         </NavLink>
 
+        {/* 匹配中心（Phase 3c） */}
+        <NavLink to="/match" className="flex-1">
+          {({ isActive }) => (
+            <NavItem icon={<Sparkles size={22} />} label="匹配" isActive={isActive} />
+          )}
+        </NavLink>
+
         {/* AI 访谈 — 凸起的中心按钮（核心功能入口） */}
         <NavLink to="/interview" className="flex-1 flex justify-center -mt-5">
           <div

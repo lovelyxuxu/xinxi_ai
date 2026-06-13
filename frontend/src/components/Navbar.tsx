@@ -31,6 +31,7 @@ const BASE_LINKS = [
 ] as const
 
 const AUTH_LINKS = [
+  { to: '/match', label: '匹配', icon: Sparkles },
   { to: '/fate', label: '心动', icon: Heart },
   { to: '/history', label: '历史', icon: History },
 ] as const
