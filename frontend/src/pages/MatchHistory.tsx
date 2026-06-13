@@ -25,12 +25,11 @@ import {
 import { LoadingState } from '@/components/LoadingState'
 import { ScoreDisplay } from '@/components/ScoreDisplay'
 import { MatchLetterCard } from '@/components/MatchLetterCard'
-import { cn } from '@/lib/utils'
 import { ChevronDown, ChevronUp } from 'lucide-react'
-import type { UserProfile, MatchResult } from '@/types'
+import type { UserPublic, MatchResult } from '@/types'
 
 export default function MatchHistory() {
-  const [users, setUsers] = useState<UserProfile[]>([])
+  const [users, setUsers] = useState<UserPublic[]>([])
   const [selectedUser, setSelectedUser] = useState('')
   const [records, setRecords] = useState<MatchResult[]>([])
   const [loading, setLoading] = useState(false)
@@ -126,7 +125,7 @@ export default function MatchHistory() {
                         )}
                       </div>
                       <p className="text-sm text-gray-600">{cand.reason}</p>
-                      {isExpanded && letter && <MatchLetterCard letter={letter} candidateName={cand.nickname} className="mt-3" />}
+                      {isExpanded && letter && <div className="mt-3"><MatchLetterCard letter={letter} candidateName={cand.nickname} /></div>}
                     </div>
                   )
                 })}

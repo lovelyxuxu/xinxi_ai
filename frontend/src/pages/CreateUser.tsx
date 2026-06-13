@@ -82,7 +82,7 @@ export default function CreateUser() {
         <p className="text-muted-foreground">填写你的资料，让 AI 红娘为你寻找缘分</p>
       </div>
 
-      {error && <ErrorAlert message={error} className="mb-6" />}
+      {error && <div className="mb-6"><ErrorAlert message={error} /></div>}
 
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* 基础信息 */}

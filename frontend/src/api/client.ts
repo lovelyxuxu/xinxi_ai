@@ -74,8 +74,11 @@ export const clearTokens = () => {
   refreshToken = null
 }
 
-/** 获取当前 Token（供 WebSocket 连接等场景使用） */
+/** 获取当前 Access Token（供 WebSocket 连接等场景使用） */
 export const getAccessToken = (): string | null => accessToken
+
+/** 获取当前 Refresh Token */
+export const getRefreshToken = (): string | null => refreshToken
 
 /** 是否有有效的 Token */
 export const hasToken = (): boolean => !!accessToken

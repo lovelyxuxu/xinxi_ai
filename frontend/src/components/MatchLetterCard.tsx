@@ -16,7 +16,7 @@ interface MatchLetterCardProps {
   index?: number
 }
 
-export function MatchLetterCard({ letter, candidateName, index = 0 }: MatchLetterCardProps) {
+export function MatchLetterCard({ letter, candidateName }: MatchLetterCardProps) {
   return (
     <Card className="border-rose-200/50 bg-gradient-to-br from-rose-50 to-pink-50">
       <CardHeader className="pb-2">

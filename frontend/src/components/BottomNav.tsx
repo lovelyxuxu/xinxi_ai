@@ -19,7 +19,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useAppStore } from '@/stores/appStore'
 
 export default function BottomNav() {
-  const { isAuthenticated, user } = useAuth()
+  const { isAuthenticated } = useAuth()
   const location = useLocation()
   const unreadCount = useAppStore((s) => s.unreadCount)
 
