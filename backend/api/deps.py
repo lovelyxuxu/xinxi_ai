@@ -31,6 +31,7 @@ Phase 2 多 Agent 架构：
 
 import uuid
 import json
+import asyncio
 from pathlib import Path
 from typing import Optional
 from datetime import datetime
@@ -54,6 +55,38 @@ from data.mock_data import get_mock_users
 USE_SQLITE = True
 SQLITE_DB_PATH = Path(__file__).parent.parent / "data" / "checkpoints.db"
 HISTORY_DB_PATH = Path(__file__).parent.parent / "data" / "history.db"
+
+
+class MatchSession:
+    """
+    匹配会话：管理一次完整匹配流程的生命周期。
+
+    学习要点：
+    ---------
+    1. asyncio.Queue：
+       - 后台 Agent 任务把 SSE 事件 put() 进队列
+       - SSE endpoint 的 generator 从队列 get() 事件并写入响应
+       - 这是 Python asyncio 中生产者-消费者模式的标准实现
+
+    2. asyncio.Event：
+       - HITL resume 信号：后台任务 await self.resume_event.wait()
+       - POST /resume 端点调用 self.resume_event.set() 唤醒后台任务
+       - 配合 self.resume_payload 传递用户决策数据
+
+    3. 状态机：
+       running → waiting_hitl → running → done
+                                        ↘ error
+    """
+
+    def __init__(self, session_id: str, user_id: str):
+        self.session_id = session_id
+        self.user_id = user_id
+        self.status: str = "running"           # running | waiting_hitl | done | error
+        self.event_queue: asyncio.Queue = asyncio.Queue()
+        self.resume_event: asyncio.Event = asyncio.Event()
+        self.resume_payload: dict = {"action": "proceed"}
+        self.result: dict | None = None
+        self.error: str | None = None
 
 
 class AppServices:
@@ -94,6 +127,10 @@ class AppServices:
         if self.match_history:
             total = sum(len(v) for v in self.match_history.values())
             print(f"  [HistoryStore] 从 SQLite 恢复了 {total} 条匹配记录")
+
+        # Phase 3c: 活跃匹配会话（内存，重启后清空）
+        # key = session_id, value = MatchSession
+        self.match_sessions: dict[str, MatchSession] = {}
 
         # 3. 导入模拟数据（如果数据库为空）
         if self.chroma_store.get_user_count() == 0:

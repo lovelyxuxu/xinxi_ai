@@ -242,3 +242,35 @@ class NotificationListResponse(BaseModel):
     """通知列表响应"""
     items: List[NotificationResponse]
     unread_count: int
+
+
+# ============================================================
+# Phase 3c：匹配会话相关 Schema（SSE + HITL）
+# ============================================================
+
+class MatchStartRequest(BaseModel):
+    """
+    开始匹配请求体。
+    user_filters 允许用户临时调整匹配参数（不修改个人资料）。
+    """
+    user_filters: Optional[dict] = Field(
+        default=None,
+        description="临时筛选参数，覆盖用户默认偏好（可选）",
+    )
+
+
+class MatchStartResponse(BaseModel):
+    """开始匹配响应：返回 session_id，前端用它订阅 SSE 流"""
+    session_id: str
+    message: str = "匹配已启动，请订阅 SSE 流获取实时进度"
+
+
+class MatchResumeRequest(BaseModel):
+    """
+    HITL 恢复请求体。
+    用户在查看候选人预览后，决定继续分析还是调整条件。
+    """
+    action: str = Field(
+        default="proceed",
+        description="proceed = 开始深度分析（目前只支持 proceed）",
+    )
