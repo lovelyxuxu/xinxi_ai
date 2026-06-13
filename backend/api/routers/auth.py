@@ -86,6 +86,9 @@ async def register(body: UserCreate, db: AsyncSession = Depends(get_db)):
         password_hash=hash_password(body.password),
         target_gender="女" if body.gender == "男" else "男",
         profile_complete=False,
+        # 注册时暂不填写，user 在个人中心完善后 profile_complete 才变 True
+        city="",
+        province="",
     )
     db.add(user)
     await db.flush()
