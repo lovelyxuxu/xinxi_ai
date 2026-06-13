@@ -293,3 +293,65 @@ export interface TokenRefreshResponse {
   refresh_token: string
   token_type: string
 }
+
+// ============================================================
+//  v3 缘分分析相关类型
+// ============================================================
+
+/** 心动清单 - 单条候选者记录 */
+export interface FateCandidateItem {
+  candidate_id: string
+  note?: string | null
+  added_at: string
+  candidate: UserPublic
+}
+
+/** 心动清单列表响应 */
+export interface FateCandidateListResponse {
+  items: FateCandidateItem[]
+  total: number
+}
+
+/** 发起缘分分析的请求体 */
+export interface FateAnalysisCreate {
+  analysis_type: 'group_overview' | 'deep_compatibility' | 'comm_advice' | 'comparison'
+  candidate_ids: string[]
+  match_params_override?: Record<string, unknown> | null
+  parent_analysis_id?: string | null
+}
+
+/** 缘分分析记录 */
+export interface FateAnalysisRecord {
+  analysis_id: string
+  analysis_type: string
+  candidate_ids: string[]
+  result: Record<string, unknown> | null
+  status: 'pending' | 'done' | 'failed'
+  created_at: string
+}
+
+/** 通知记录 */
+export interface NotificationItem {
+  notif_id: string
+  type: string
+  actor_id?: string | null
+  payload: Record<string, unknown>
+  is_read: boolean
+  created_at: string
+}
+
+/** 通知列表响应 */
+export interface NotificationListResponse {
+  items: NotificationItem[]
+  unread_count: number
+}
+
+/** 临时偏好参数（发起分析时可覆盖） */
+export interface MatchParams {
+  target_age_min?: number
+  target_age_max?: number
+  target_city?: string
+  target_height_min?: number
+  target_height_max?: number
+  target_education?: string
+}

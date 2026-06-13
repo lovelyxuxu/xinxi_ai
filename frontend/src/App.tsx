@@ -23,6 +23,8 @@ import Register from './pages/Register'
 import MatchHistory from './pages/MatchHistory'
 import MyProfile from './pages/MyProfile'
 import EditProfile from './pages/EditProfile'
+import FateList from './pages/FateList'
+import FateAnalysis from './pages/FateAnalysis'
 
 export default function App() {
   return (
@@ -50,7 +52,16 @@ export default function App() {
           <Route path="/profile/edit" element={
             <ProtectedRoute><EditProfile /></ProtectedRoute>
           } />
-          {/* Phase 3 将添加：/match、/interview */}
+
+          {/* === v3: 心动清单 + 缘分分析 === */}
+          <Route path="/fate" element={
+            <ProtectedRoute><FateList /></ProtectedRoute>
+          } />
+          <Route path="/fate/analysis/:analysisId" element={
+            <ProtectedRoute requireProfileComplete><FateAnalysis /></ProtectedRoute>
+          } />
+
+          {/* Phase 4 将添加：/chat、/chat/:convId、/social */}
           {/* Phase 4 将添加：/chat、/chat/:convId、/social */}
           {/* Phase 5 将添加：/settings */}
         </Routes>

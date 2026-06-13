@@ -13,9 +13,10 @@
  * - 支持 size、color、strokeWidth 等 props 自定义
  * - 用 SVG 实现，缩放清晰，不像 emoji 会受系统主题影响
  */
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
+import { getUnreadCount } from '@/api/client'
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -30,8 +31,8 @@ const BASE_LINKS = [
 ] as const
 
 const AUTH_LINKS = [
+  { to: '/fate', label: '心动', icon: Heart },
   { to: '/history', label: '历史', icon: History },
-  { to: '/match', label: '匹配', icon: Heart },
 ] as const
 
 export default function Navbar() {
@@ -39,6 +40,21 @@ export default function Navbar() {
   const navigate = useNavigate()
   const [sheetOpen, setSheetOpen] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [unreadCount, setUnreadCount] = useState(0)
+
+  // 轮询未读通知数（每 30s 刷新一次）
+  useEffect(() => {
+    if (!isAuthenticated) { setUnreadCount(0); return }
+    const fetchCount = async () => {
+      try {
+        const res = await getUnreadCount()
+        setUnreadCount(res.data.unread_count)
+      } catch { /* 忽略错误 */ }
+    }
+    fetchCount()
+    const timer = setInterval(fetchCount, 30_000)
+    return () => clearInterval(timer)
+  }, [isAuthenticated])
 
   const navLinks = isAuthenticated
     ? [...BASE_LINKS, ...AUTH_LINKS]
@@ -97,15 +113,22 @@ export default function Navbar() {
         <div className="hidden md:flex items-center gap-2">
           {isAuthenticated ? (
             <div className="relative flex items-center gap-2">
-              {/* 通知铃铛占位（Phase 3b 接通实际数量） */}
+              {/* 通知铃铛 */}
               <button
                 className="btn-ghost p-2 relative"
                 style={{ borderRadius: '50%', border: 'none', background: 'transparent' }}
                 title="通知"
+                onClick={() => navigate('/fate')}
               >
                 <Bell size={18} style={{ color: 'var(--color-text-secondary)' }} />
-                {/* 角标：Phase 3b 接通真实通知数 */}
-                {/* <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center">3</span> */}
+                {unreadCount > 0 && (
+                  <span
+                    className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full text-white text-[10px] font-bold flex items-center justify-center"
+                    style={{ background: '#f093fb' }}
+                  >
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </span>
+                )}
               </button>
               <button
                 onClick={() => setMenuOpen(!menuOpen)}

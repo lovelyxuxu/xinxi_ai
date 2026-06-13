@@ -38,10 +38,10 @@ export default function BottomNav() {
           )}
         </NavLink>
 
-        {/* 匹配 */}
-        <NavLink to="/match" className="flex-1">
+        {/* 心动清单 */}
+        <NavLink to="/fate" className="flex-1">
           {({ isActive }) => (
-            <NavItem icon={<Heart size={22} />} label="匹配" isActive={isActive} />
+            <NavItem icon={<Heart size={22} />} label="心动" isActive={isActive} />
           )}
         </NavLink>
 

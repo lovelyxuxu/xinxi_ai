@@ -30,6 +30,10 @@ import type {
   LoginRequest,
   RegisterRequest,
   TokenRefreshResponse,
+  FateCandidateListResponse,
+  FateAnalysisCreate,
+  FateAnalysisRecord,
+  NotificationListResponse,
 } from '@/types'
 
 // ============================================================
@@ -259,5 +263,65 @@ export const deletePhoto = (index: number): Promise<AxiosResponse<{ url: string;
  */
 export const getUserPublic = (userId: string): Promise<AxiosResponse<UserPublic>> =>
   api.get(`/users/${userId}`)
+
+// ============================================================
+//  v3 心动 TA 们 + 缘分分析接口
+// ============================================================
+
+/** 加入心动清单 */
+export const addFateCandidate = (
+  candidateId: string,
+): Promise<AxiosResponse<{ message: string; mutual_fate: boolean }>> =>
+  api.post(`/fate/candidates/${candidateId}`)
+
+/** 从心动清单移除 */
+export const removeFateCandidate = (candidateId: string): Promise<AxiosResponse<void>> =>
+  api.delete(`/fate/candidates/${candidateId}`)
+
+/** 获取我的心动清单 */
+export const getFateCandidates = (): Promise<AxiosResponse<FateCandidateListResponse>> =>
+  api.get('/fate/candidates')
+
+/** 检查是否已将某用户加入心动清单 */
+export const getCandidateStatus = (
+  targetUserId: string,
+): Promise<AxiosResponse<{ is_hearted: boolean }>> =>
+  api.get(`/fate/candidates/status/${targetUserId}`)
+
+/** 发起缘分分析（后台异步执行，立即返回 analysis_id） */
+export const createFateAnalysis = (
+  data: FateAnalysisCreate,
+): Promise<AxiosResponse<FateAnalysisRecord>> =>
+  api.post('/fate/analyses', data)
+
+/** 获取单条分析结果（前端轮询到 status=done） */
+export const getFateAnalysis = (
+  analysisId: string,
+): Promise<AxiosResponse<FateAnalysisRecord>> =>
+  api.get(`/fate/analyses/${analysisId}`)
+
+/** 获取历史分析列表 */
+export const listFateAnalyses = (): Promise<AxiosResponse<FateAnalysisRecord[]>> =>
+  api.get('/fate/analyses')
+
+// ============================================================
+//  v3 通知接口
+// ============================================================
+
+/** 获取通知列表 */
+export const getNotifications = (): Promise<AxiosResponse<NotificationListResponse>> =>
+  api.get('/notifications')
+
+/** 标记单条通知已读 */
+export const markNotificationRead = (notifId: string): Promise<AxiosResponse<void>> =>
+  api.put(`/notifications/${notifId}/read`)
+
+/** 全部标记已读 */
+export const markAllNotificationsRead = (): Promise<AxiosResponse<void>> =>
+  api.put('/notifications/read-all')
+
+/** 获取未读通知数量（Navbar 角标用） */
+export const getUnreadCount = (): Promise<AxiosResponse<{ unread_count: number }>> =>
+  api.get('/notifications/unread-count')
 
 export default api

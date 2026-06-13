@@ -22,43 +22,46 @@ import { MapPin, Heart, GraduationCap } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import type { UserPublic } from '@/types'
 import { cn } from '@/lib/utils'
+import { addFateCandidate, removeFateCandidate } from '@/api/client'
+import { useAuth } from '@/contexts/AuthContext'
 
 interface UserCardProps {
   user: UserPublic
   className?: string
-  /** 是否已加入心动清单（Phase 3b 接通实际数据） */
+  /** 是否已加入心动清单 */
   isHearted?: boolean
-  /** 心动按钮点击回调（Phase 3b 接通实际逻辑） */
-  onHeartToggle?: (userId: string, currentState: boolean) => void
+  /** 心动状态变更后的外部回调（可选） */
+  onHeartToggle?: (userId: string, isNowHearted: boolean) => void
 }
 
-/** 心动按钮 — 右下角渐变爱心（Phase 3b 完整接通） */
+/** 心动按钮 — 右下角渐变爱心 */
 function HeartButton({
   isActive,
   onClick,
+  loading = false,
 }: {
   isActive: boolean
   onClick: (e: React.MouseEvent) => void
+  loading?: boolean
 }) {
   return (
     <motion.button
-      className={cn(
-        'btn-heart',
-        isActive ? 'heart-active' : '',
-      )}
+      className={cn('btn-heart', isActive ? 'heart-active' : '')}
       style={
         isActive
           ? {}
-          : {
-              background: 'rgba(255,255,255,0.15)',
-              border: '1px solid rgba(255,255,255,0.25)',
-            }
+          : { background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.25)' }
       }
       whileTap={{ scale: 0.85 }}
       onClick={onClick}
       aria-label={isActive ? '取消心动' : '加入心动TA们'}
+      disabled={loading}
     >
-      <Heart size={16} fill={isActive ? 'white' : 'none'} color="white" strokeWidth={2} />
+      {loading ? (
+        <div className="w-4 h-4 border border-white/40 border-t-white rounded-full animate-spin" />
+      ) : (
+        <Heart size={16} fill={isActive ? 'white' : 'none'} color="white" strokeWidth={2} />
+      )}
     </motion.button>
   )
 }
@@ -70,16 +73,37 @@ export default function UserCard({
   onHeartToggle,
 }: UserCardProps) {
   const navigate = useNavigate()
+  const { isAuthenticated } = useAuth()
   const [hearted, setHearted] = useState(isHearted)
+  const [heartLoading, setHeartLoading] = useState(false)
 
   // 优先用第一张照片，其次用头像作为封面
   const coverImage = user.photos?.[0] || user.avatar_url
 
-  const handleHeartClick = (e: React.MouseEvent) => {
+  const handleHeartClick = async (e: React.MouseEvent) => {
     e.stopPropagation()
+    // 未登录则跳转登录页
+    if (!isAuthenticated) {
+      navigate('/login', { state: { from: '/' } })
+      return
+    }
+    if (heartLoading) return
+    setHeartLoading(true)
     const next = !hearted
-    setHearted(next)
-    onHeartToggle?.(user.user_id, hearted)
+    setHearted(next) // 乐观更新
+    try {
+      if (next) {
+        await addFateCandidate(user.user_id)
+      } else {
+        await removeFateCandidate(user.user_id)
+      }
+      onHeartToggle?.(user.user_id, next)
+    } catch {
+      // 失败回滚
+      setHearted(!next)
+    } finally {
+      setHeartLoading(false)
+    }
   }
 
   return (
@@ -134,7 +158,11 @@ export default function UserCard({
               )}
             </div>
             {/* 心动按钮 */}
-            <HeartButton isActive={hearted} onClick={handleHeartClick} />
+            <HeartButton
+              isActive={hearted}
+              onClick={handleHeartClick}
+              loading={heartLoading}
+            />
           </div>
         </div>
 
