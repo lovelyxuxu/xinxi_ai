@@ -32,6 +32,10 @@ class HardFilters(BaseModel):
     age_min: int = Field(description="期望对方最小年龄")
     age_max: int = Field(description="期望对方最大年龄")
     city: str = Field(description="期望对方城市，'不限'表示无限制")
+    exclude_ids: list[str] = Field(
+        default_factory=list,
+        description="需要排除的用户ID列表（来自黑名单和历史推荐，可为空列表）",
+    )
 
 
 class IntentParseResult(BaseModel):
