@@ -183,6 +183,26 @@ async def get_current_user(
     return user_id
 
 
+def verify_token_str(token: str) -> Optional[str]:
+    """
+    验证 JWT token 字符串，返回 user_id 或 None。
+    专为 SSE 端点使用（EventSource 不支持自定义 Header，通过 query param 传 token）。
+
+    学习要点：
+    SSE（Server-Sent Events）使用浏览器原生的 EventSource API，
+    EventSource 不允许设置自定义 Headers（包括 Authorization）。
+    因此 SSE 端点需要通过 URL query string 传递 token：
+      GET /api/match/{session_id}/stream?token=<jwt_token>
+    """
+    try:
+        payload = decode_token(token)
+        if payload.get("type") != "access":
+            return None
+        return payload.get("sub")
+    except HTTPException:
+        return None
+
+
 async def get_optional_user(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
 ) -> Optional[str]:

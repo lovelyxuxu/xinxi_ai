@@ -26,15 +26,20 @@ Phase 4 Checkpointing：
 """
 
 import json
+import asyncio
 from datetime import datetime
-from fastapi import APIRouter, HTTPException, Depends, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, HTTPException, Depends, WebSocket, WebSocketDisconnect, BackgroundTasks, Query
+from fastapi.responses import StreamingResponse
 from langchain_core.runnables import RunnableConfig
+from langgraph.types import Command
 
 from api.schemas import (
     MatchRequest, MatchResult, MatchCandidate,
     MatchHistoryResponse, MessageResponse,
+    MatchStartRequest, MatchStartResponse, MatchResumeRequest,
 )
-from api.deps import get_services, AppServices, generate_match_id
+from api.deps import get_services, AppServices, generate_match_id, MatchSession
+from api.auth import get_current_user, verify_token_str
 from core.agent.state import AgentState
 from core.models.user_profile import UserProfile
 # Phase 3: LangFuse 可观测性集成
@@ -458,3 +463,372 @@ def evaluate_match_result(match_id: str, svc: AppServices = Depends(get_services
         "match_id": match_id,
         "evaluation": evaluation.model_dump(),
     }
+
+
+# ============================================================
+# Phase 3c：SSE 匹配流 — 辅助函数
+# ============================================================
+
+# LangGraph 节点名 → SSE 展示标签
+_SSE_NODE_LABELS: dict[str, tuple[str, str]] = {
+    "supervisor":       ("🤖", "Supervisor 调度中"),
+    "intent_agent":     ("🔍", "正在解析你的偏好..."),
+    "retrieval_agent":  ("📋", "向量数据库检索中..."),
+    "hitl_node":        ("👀", "预览候选人，等待确认..."),
+    "analysis_agent":   ("🧠", "深度分析匹配维度..."),
+    "reflection_agent": ("🔄", "优化匹配策略..."),
+    "letter_agent":     ("💌", "生成个性化推荐词..."),
+    "judge_agent":      ("⚖️", "质量评估中..."),
+}
+
+
+def _langgraph_event_to_sse(event: dict) -> dict | None:
+    """
+    将 LangGraph astream_events(version="v2") 产生的原始事件转换为 SSE 格式。
+
+    学习要点：
+    astream_events(version="v2") 的主要事件类型：
+      on_chain_start  - 节点（chain）开始执行
+      on_chain_end    - 节点执行完毕，output 在 data.output 中
+      on_tool_start   - LLM 决定调用工具，开始执行
+      on_tool_end     - 工具执行完毕
+      on_chat_model_stream - LLM 流式 token（本项目暂不使用）
+
+    metadata.langgraph_node 包含当前执行的节点名。
+    """
+    kind = event.get("event", "")
+    node_name = event.get("metadata", {}).get("langgraph_node", "")
+
+    # 节点开始事件
+    if kind == "on_chain_start" and node_name in _SSE_NODE_LABELS:
+        emoji, msg = _SSE_NODE_LABELS[node_name]
+        return {"event": "agent_start", "node": node_name, "emoji": emoji, "msg": msg}
+
+    # 工具调用开始
+    if kind == "on_tool_start":
+        tool_name = event.get("name", "unknown_tool")
+        return {"event": "tool_call", "node": node_name, "tool": tool_name, "status": "calling"}
+
+    # 工具调用完成
+    if kind == "on_tool_end":
+        tool_name = event.get("name", "unknown_tool")
+        return {"event": "tool_result", "node": node_name, "tool": tool_name, "status": "done"}
+
+    # 节点完成：提取最后一条 message 作为摘要
+    if kind == "on_chain_end" and node_name in _SSE_NODE_LABELS:
+        output = event.get("data", {}).get("output", {})
+        if isinstance(output, dict):
+            node_messages = output.get("messages", [])
+            summary = node_messages[-1] if node_messages else ""
+            if summary:
+                return {"event": "agent_complete", "node": node_name, "msg": summary}
+
+    return None  # 不感兴趣的事件
+
+
+async def _run_match_background(
+    session: MatchSession,
+    svc: AppServices,
+    user_filters: dict | None,
+):
+    """
+    匹配流程后台任务：在 asyncio 任务中运行 LangGraph 图，
+    将事件通过 session.event_queue 推送给 SSE generator。
+
+    学习要点：
+    ---------
+    这是 SSE + HITL 实现的核心逻辑，分为两个阶段：
+
+    阶段1（run until interrupt）：
+      graph.astream_events() 持续产生事件，直到遇到 interrupt() 暂停
+      astream_events() 的 async for 循环结束后，
+      用 graph.aget_state(config) 检查是否有 pending interrupt
+
+    阶段2（wait for resume, then continue）：
+      等待用户通过 POST /resume 发送恢复信号（asyncio.Event）
+      用 Command(resume=...) 继续图执行
+    """
+    config = {"configurable": {"thread_id": session.session_id}}
+
+    try:
+        user_profile = _rebuild_user_profile(session.user_id, svc)
+    except Exception as e:
+        session.status = "error"
+        session.error = str(e)
+        await session.event_queue.put({"event": "error", "msg": str(e)})
+        await session.event_queue.put(None)
+        return
+
+    # 临时覆盖偏好参数（不修改用户档案）
+    if user_filters:
+        if "target_age_min" in user_filters:
+            user_profile.target_age_min = user_filters["target_age_min"]
+        if "target_age_max" in user_filters:
+            user_profile.target_age_max = user_filters["target_age_max"]
+        if "target_city" in user_filters:
+            user_profile.target_city = user_filters["target_city"]
+
+    initial_state: AgentState = {
+        "user_profile": user_profile,
+        "loop_count": 0,
+        "messages": [],
+    }
+
+    await session.event_queue.put({
+        "event": "agent_start",
+        "node": "start",
+        "emoji": "✨",
+        "msg": f"开始为 {user_profile.nickname} 寻找缘分...",
+    })
+
+    try:
+        # ============================
+        # 阶段1：运行图直到 interrupt 或完成
+        # 学习要点：astream_events() 会在遇到 interrupt() 时自然停止
+        # ============================
+        async for raw_event in svc.matching_graph.astream_events(
+            initial_state, config=config, version="v2"
+        ):
+            sse = _langgraph_event_to_sse(raw_event)
+            if sse:
+                await session.event_queue.put(sse)
+
+        # 检查是否因 interrupt() 而暂停
+        # 学习要点：graph.aget_state(config) 返回最近一次执行的快照
+        #   snapshot.tasks: 还未完成的任务列表
+        #   task.interrupts: 该任务触发的 interrupt() 列表（含 payload）
+        snapshot = await svc.matching_graph.aget_state(config)
+
+        has_interrupt = snapshot.tasks and any(
+            t.interrupts for t in snapshot.tasks
+        )
+
+        if has_interrupt:
+            # 找到 interrupt payload
+            interrupt_value = snapshot.tasks[0].interrupts[0].value
+            session.status = "waiting_hitl"
+
+            # 通过 SSE 把候选人预览推送给前端
+            await session.event_queue.put({
+                "event": "hitl_preview",
+                "candidates": interrupt_value.get("candidates", []),
+                "retrieval_note": interrupt_value.get("retrieval_note", ""),
+                "candidate_count": interrupt_value.get("candidate_count", 0),
+            })
+
+            # ============================
+            # 等待 POST /resume 的信号
+            # 学习要点：asyncio.Event.wait() 会挂起协程，
+            # 直到 resume_event.set() 被调用（由 /resume 端点触发）
+            # ============================
+            await session.resume_event.wait()
+            session.status = "running"
+
+            await session.event_queue.put({
+                "event": "agent_start",
+                "node": "resume",
+                "emoji": "🚀",
+                "msg": "开始深度分析匹配维度...",
+            })
+
+            # ============================
+            # 阶段2：用 Command(resume=...) 继续执行
+            # 学习要点：Command(resume=value) 告诉 LangGraph
+            # "以 value 作为 interrupt() 的返回值，从中断点恢复执行"
+            # ============================
+            async for raw_event in svc.matching_graph.astream_events(
+                Command(resume=session.resume_payload),
+                config=config,
+                version="v2",
+            ):
+                sse = _langgraph_event_to_sse(raw_event)
+                if sse:
+                    await session.event_queue.put(sse)
+
+        # 获取最终状态，构建结果
+        final_snapshot = await svc.matching_graph.aget_state(config)
+        final_values = final_snapshot.values if final_snapshot else {}
+
+        result = _build_final_result(final_values, session.user_id)
+        svc.save_match_record(session.user_id, result)
+
+        session.result = result
+        session.status = "done"
+
+        await session.event_queue.put({
+            "event": "complete",
+            "match_id": result["match_id"],
+            "result_count": len(result.get("candidates", [])),
+        })
+
+    except Exception as e:
+        session.status = "error"
+        session.error = str(e)
+        await session.event_queue.put({"event": "error", "msg": f"匹配出错: {str(e)}"})
+
+    finally:
+        # 哨兵值：通知 SSE generator 流已结束
+        await session.event_queue.put(None)
+
+
+# ============================================================
+# Phase 3c：SSE 匹配流 API 端点
+# ============================================================
+
+@router.post("/start", response_model=MatchStartResponse)
+async def start_match(
+    body: MatchStartRequest,
+    background_tasks: BackgroundTasks,
+    svc: AppServices = Depends(get_services),
+    current_user_id: str = Depends(get_current_user),
+):
+    """
+    创建匹配会话并启动后台 Agent 工作流。
+
+    学习要点：
+    ---------
+    BackgroundTasks：
+    - FastAPI 内置后台任务工具
+    - add_task(fn, ...) 在当前请求返回后异步执行 fn
+    - 同一进程内运行（不是新进程），适合轻量级后台工作
+    - 使用场景：响应不依赖任务结果，但需要在后台触发某些操作
+    """
+    import uuid as _uuid
+    session_id = "MS" + _uuid.uuid4().hex[:12].upper()
+
+    session = MatchSession(session_id=session_id, user_id=current_user_id)
+    svc.match_sessions[session_id] = session
+
+    background_tasks.add_task(
+        _run_match_background,
+        session=session,
+        svc=svc,
+        user_filters=body.user_filters,
+    )
+
+    return MatchStartResponse(session_id=session_id)
+
+
+@router.get("/{session_id}/stream")
+async def stream_match(
+    session_id: str,
+    svc: AppServices = Depends(get_services),
+    token: str = Query(..., description="JWT token（EventSource 不支持 Header，通过 query param 传递）"),
+):
+    """
+    SSE 流：实时推送匹配进度。
+
+    学习要点：
+    ---------
+    1. Server-Sent Events（SSE）格式：
+       每条事件格式为：data: <JSON字符串>\\n\\n
+       浏览器通过 EventSource API 自动解析，触发 onmessage 回调
+
+    2. StreamingResponse + async generator：
+       - media_type="text/event-stream" 告知浏览器这是 SSE 流
+       - Cache-Control: no-cache 防止浏览器缓存
+       - X-Accel-Buffering: no 防止 nginx 缓冲导致事件延迟
+
+    3. asyncio.Queue 生产者-消费者模式：
+       - 生产者：_run_match_background() 把事件 put() 进队列
+       - 消费者：event_generator() 从队列 get() 事件并 yield 到响应流
+       - None 作为哨兵值：生产者放入 None 表示流结束
+
+    4. 为什么 token 放 query param：
+       - EventSource API 不支持设置自定义 HTTP Headers
+       - 通过 URL query string 传递 JWT token
+       - HTTPS 下 URL 参数是加密的，安全性可接受
+    """
+    user_id = verify_token_str(token)
+    if not user_id:
+        from fastapi.responses import JSONResponse
+        return JSONResponse(status_code=401, content={"detail": "无效 Token"})
+
+    session = svc.match_sessions.get(session_id)
+    if not session:
+        from fastapi.responses import JSONResponse
+        return JSONResponse(status_code=404, content={"detail": "会话不存在"})
+
+    if session.user_id != user_id:
+        from fastapi.responses import JSONResponse
+        return JSONResponse(status_code=403, content={"detail": "无权访问此会话"})
+
+    async def event_generator():
+        """SSE 事件生成器：从队列读取事件，格式化为 SSE 文本"""
+        while True:
+            try:
+                # 等待下一个事件（超时 60s 防止永久挂起）
+                event = await asyncio.wait_for(session.event_queue.get(), timeout=60.0)
+            except asyncio.TimeoutError:
+                yield 'data: {"event": "keepalive"}\n\n'
+                continue
+
+            if event is None:
+                # 哨兵值：流结束
+                yield 'data: {"event": "stream_end"}\n\n'
+                return
+
+            yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+            "Access-Control-Allow-Origin": "*",
+        },
+    )
+
+
+@router.post("/{session_id}/resume", status_code=204)
+async def resume_match(
+    session_id: str,
+    body: MatchResumeRequest,
+    svc: AppServices = Depends(get_services),
+    current_user_id: str = Depends(get_current_user),
+):
+    """
+    HITL 恢复端点：用户确认候选人预览后，继续深度分析。
+
+    学习要点：
+    ---------
+    asyncio.Event 信号机制：
+    - session.resume_event.wait() 在后台任务中挂起协程
+    - session.resume_event.set() 在这里唤醒等待的协程
+    - 这是 Python asyncio 中协程间通信的标准方式之一
+    - 对比 asyncio.Queue：Event 适合"一次性信号"，Queue 适合"持续消息"
+    """
+    session = svc.match_sessions.get(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="会话不存在")
+    if session.user_id != current_user_id:
+        raise HTTPException(status_code=403, detail="无权操作此会话")
+    if session.status != "waiting_hitl":
+        raise HTTPException(
+            status_code=400,
+            detail=f"会话当前状态为 {session.status}，不在 HITL 等待状态"
+        )
+
+    # 存储用户决策并唤醒后台任务
+    session.resume_payload = {"action": body.action}
+    session.resume_event.set()
+
+
+@router.get("/{session_id}/result")
+async def get_match_session_result(
+    session_id: str,
+    svc: AppServices = Depends(get_services),
+    current_user_id: str = Depends(get_current_user),
+):
+    """获取匹配会话的最终结果"""
+    session = svc.match_sessions.get(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="会话不存在")
+    if session.user_id != current_user_id:
+        raise HTTPException(status_code=403, detail="无权访问此会话")
+    if session.status in ("running", "waiting_hitl"):
+        return {"status": session.status, "result": None}
+    if session.status == "error":
+        raise HTTPException(status_code=500, detail=session.error or "匹配失败")
+    return {"status": "done", "result": session.result}
