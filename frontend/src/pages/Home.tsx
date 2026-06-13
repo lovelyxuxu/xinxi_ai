@@ -16,6 +16,7 @@ import { SlidersHorizontal, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import UserCard from '@/components/UserCard'
+import ProfileCompleteBanner from '@/components/ProfileCompleteBanner'
 import { getUsers } from '@/api/client'
 import type { UserPublic } from '@/types'
 
@@ -67,6 +68,9 @@ export default function Home() {
 
   return (
     <div className="space-y-4">
+      {/* 资料未完善引导横幅 */}
+      <ProfileCompleteBanner />
+
       {/* 搜索和筛选栏（sticky，滚动时固定在 Navbar 下方） */}
       <div className="flex gap-2 sticky top-16 z-10 py-2 -mx-4 px-4 bg-background/90 backdrop-blur-md">
         <div className="relative flex-1">

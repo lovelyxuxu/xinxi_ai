@@ -179,23 +179,24 @@ export interface ChatMessage {
 export interface UserPublic {
   user_id: string
   nickname: string
-  gender: 'male' | 'female'
-  age: number
-  city: string
-  province: string
-  education: string
-  annual_income: string
-  marital_status: string
-  mbti: string
+  gender: string
+  age?: number | null
+  city?: string | null
+  province?: string | null
+  education?: string | null
+  annual_income?: string | null
+  marital_status?: string | null
+  mbti?: string | null
   height_cm?: number | null
   about_me: string
   hobbies: string
   avatar_url?: string | null
   photos: string[]
+  birth_date?: string | null
+  zodiac_sign?: string | null
+  chinese_zodiac?: string | null
+  profile_complete?: boolean
   created_at?: string
-  follower_count: number
-  following_count: number
-  match_count: number
 }
 
 /**
@@ -231,43 +232,57 @@ export interface MessageResponse {
 
 /**
  * 认证用户 — 登录/注册后返回的完整用户信息
- *
- * 【学习要点】
- * 继承 UserProfile 的所有字段，额外加上 JWT Token 字段。
- * 注册和登录接口会同时返回 access_token 和 refresh_token，
- * 前端存储后在后续请求的 Authorization 头中带上。
  */
-export interface AuthUser extends UserProfile {
-  access_token?: string   // JWT 访问令牌（短期有效，2小时）
-  refresh_token?: string  // JWT 刷新令牌（长期有效，7天）
+export interface AuthUser {
+  user_id: string
+  nickname: string
+  gender: string
+  age?: number | null
+  city?: string | null
+  province?: string | null
+  education?: string | null
+  annual_income?: string | null
+  marital_status?: string | null
+  mbti?: string | null
   height_cm?: number | null
-  avatar_url?: string | null
-  photos?: string[]       // 用户照片列表
-  // 择偶偏好扩展字段（v2 新增）
+  about_me?: string | null
+  ideal_partner?: string | null
+  hobbies?: string | null
+  target_gender?: string | null
+  target_age_min?: number | null
+  target_age_max?: number | null
+  target_city?: string | null
   target_height_min?: number | null
   target_height_max?: number | null
   target_education?: string | null
+  avatar_url?: string | null
+  photos?: string[]
+  birth_date?: string | null
+  zodiac_sign?: string | null
+  chinese_zodiac?: string | null
+  profile_complete: boolean
+  created_at?: string
+  // Token（仅注册/登录时返回）
+  access_token?: string
+  refresh_token?: string
 }
 
 /**
- * 登录请求参数
+ * 登录请求参数（支持手机号/邮箱/user_id）
  */
 export interface LoginRequest {
-  account: string   // 邮箱或用户ID
-  password: string  // 密码
+  account: string   // 手机号、邮箱或用户ID
+  password: string
 }
 
 /**
- * 注册请求参数
- *
- * 【学习要点】
- * 扩展 UserCreate（= UserProfile 去掉 user_id 和 created_at），
- * 加上认证相关字段：password（必填）、email 和 phone（可选）。
+ * 简化注册请求参数（v3 只需 4 个字段）
  */
-export interface RegisterRequest extends UserCreate {
-  password: string          // 密码（至少6位）
-  email?: string            // 邮箱（可选）
-  phone?: string            // 手机号（可选）
+export interface RegisterRequest {
+  nickname: string
+  gender: '男' | '女'
+  phone: string
+  password: string
 }
 
 /**
