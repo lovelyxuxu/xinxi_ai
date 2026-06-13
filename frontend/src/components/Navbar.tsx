@@ -21,7 +21,7 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
   Menu, LogOut, User, Heart, Settings,
-  Compass, History, Sparkles,
+  Compass, History, Sparkles, Bell,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -51,12 +51,20 @@ export default function Navbar() {
   }
 
   return (
-    <nav className="sticky top-0 z-50 bg-card/80 backdrop-blur-xl border-b border-border">
+    <nav
+      className="sticky top-0 z-50 border-b"
+      style={{
+        background: 'rgba(15, 12, 41, 0.85)',
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
+        borderColor: 'var(--color-border)',
+      }}
+    >
       <div className="max-w-6xl mx-auto px-6 py-3 flex items-center justify-between">
         {/* Logo */}
         <NavLink to="/" className="flex items-center gap-2 no-underline">
-          <Sparkles size={20} className="text-primary animate-pulse" />
-          <span className="text-xl font-bold gradient-text">心犀AI</span>
+          <Sparkles size={20} style={{ color: '#f093fb' }} className="animate-pulse" />
+          <span className="text-xl font-bold text-gradient-primary">心犀AI</span>
         </NavLink>
 
         {/* 桌面端导航链接 — md 以上显示 */}
@@ -88,10 +96,21 @@ export default function Navbar() {
         {/* 右侧：认证区域 */}
         <div className="hidden md:flex items-center gap-2">
           {isAuthenticated ? (
-            <div className="relative">
+            <div className="relative flex items-center gap-2">
+              {/* 通知铃铛占位（Phase 3b 接通实际数量） */}
+              <button
+                className="btn-ghost p-2 relative"
+                style={{ borderRadius: '50%', border: 'none', background: 'transparent' }}
+                title="通知"
+              >
+                <Bell size={18} style={{ color: 'var(--color-text-secondary)' }} />
+                {/* 角标：Phase 3b 接通真实通知数 */}
+                {/* <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center">3</span> */}
+              </button>
               <button
                 onClick={() => setMenuOpen(!menuOpen)}
-                className="flex items-center gap-2 rounded-full hover:bg-muted px-3 py-1.5 transition-colors"
+                className="flex items-center gap-2 rounded-full px-3 py-1.5 transition-colors"
+                style={{ background: 'rgba(255,255,255,0.06)' }}
               >
                 <Avatar className="h-8 w-8 ring-1 ring-primary/30">
                   <AvatarImage src={user?.avatar_url || undefined} />
@@ -141,12 +160,12 @@ export default function Navbar() {
             </div>
           ) : (
             <>
-              <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground" asChild>
-                <NavLink to="/login">登录</NavLink>
-              </Button>
-              <Button size="sm" className="bg-gradient-primary text-white border-0 hover:opacity-90" asChild>
-                <NavLink to="/register">注册</NavLink>
-              </Button>
+                <NavLink to="/login">
+                <button className="btn-ghost text-sm px-4 py-2">登录</button>
+              </NavLink>
+              <NavLink to="/register">
+                <button className="btn-primary text-sm px-4 py-2">注册</button>
+              </NavLink>
             </>
           )}
         </div>
