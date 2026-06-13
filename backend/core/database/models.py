@@ -17,11 +17,11 @@
   4. 使用 JSONB 类型存储灵活结构（如匹配参数、评估结果）
 """
 
-from datetime import datetime
+from datetime import datetime, date
 from typing import Optional, List
 
 from sqlalchemy import (
-    String, Integer, Text, Boolean, DateTime, Float,
+    String, Integer, Text, Boolean, DateTime, Float, Date,
     ForeignKey, UniqueConstraint, CheckConstraint, Index,
     MetaData,
     func,
@@ -82,7 +82,7 @@ class User(Base):
     # === 基本信息 ===
     nickname: Mapped[str] = mapped_column(String(50), nullable=False)
     gender: Mapped[str] = mapped_column(String(10), nullable=False)
-    age: Mapped[int] = mapped_column(Integer, nullable=False)
+    age: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     city: Mapped[str] = mapped_column(String(50), nullable=False)
     province: Mapped[str] = mapped_column(String(50), nullable=False)
     education: Mapped[str] = mapped_column(String(20), default="本科")
@@ -102,6 +102,23 @@ class User(Base):
     target_height_min: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     target_height_max: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     target_education: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
+    # === 生日/星座/属相 ===
+    birth_date: Mapped[Optional[date]] = mapped_column(
+        Date, nullable=True, comment="生日，用于自动计算星座和属相",
+    )
+    zodiac_sign: Mapped[Optional[str]] = mapped_column(
+        String(10), nullable=True, comment="西方星座",
+    )
+    chinese_zodiac: Mapped[Optional[str]] = mapped_column(
+        String(10), nullable=True, comment="属相",
+    )
+
+    # === 资料完善状态 ===
+    profile_complete: Mapped[bool] = mapped_column(
+        Boolean, default=False,
+        comment="是否完成资料填写，True 才能出现在发现列表并发起匹配",
+    )
 
     # === 认证字段 ===
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -159,6 +176,10 @@ class User(Base):
             "target_education": self.target_education,
             "avatar_url": self.avatar_url,
             "photos": self.photos or [],
+            "birth_date": self.birth_date.isoformat() if self.birth_date else None,
+            "zodiac_sign": self.zodiac_sign,
+            "chinese_zodiac": self.chinese_zodiac,
+            "profile_complete": self.profile_complete,
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }
 
@@ -378,3 +399,122 @@ class Blacklist(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(),
     )
+
+
+# ============================================================
+# fate_candidates - 心动 TA 们清单
+# ============================================================
+
+class FateCandidate(Base):
+    """
+    心动 TA 们清单 - 用户手动收藏的缘分候选者。
+
+    学习要点：
+    - UniqueConstraint 防止同一对用户重复加入
+    - CheckConstraint 防止自己把自己加入清单
+    - 与 fate_analyses 共同构成「缘分分析」功能的数据基础
+
+    Agent 集成：
+    - FateAnalysisAgent 读取此表获取候选者列表
+    - 双向心动检测：检查 A→B 和 B→A 是否都存在
+    """
+    __tablename__ = "fate_candidates"
+    __table_args__ = (
+        UniqueConstraint("user_id", "candidate_id", name="uq_fate_candidate"),
+        CheckConstraint("user_id != candidate_id", name="ck_fate_no_self"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    user_id: Mapped[str] = mapped_column(
+        String(20), ForeignKey("users.user_id"), nullable=False, index=True,
+    )
+    candidate_id: Mapped[str] = mapped_column(
+        String(20), ForeignKey("users.user_id"), nullable=False, index=True,
+    )
+    note: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    added_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    user: Mapped["User"] = relationship(foreign_keys=[user_id])
+    candidate: Mapped["User"] = relationship(foreign_keys=[candidate_id])
+
+
+# ============================================================
+# fate_analyses - 缘分分析记录
+# ============================================================
+
+class FateAnalysis(Base):
+    """
+    缘分分析记录 - 存储 AI 生成的缘分分析报告。
+
+    学习要点：
+    - analysis_type 区分两层分析：第一层 group_overview，第二层三条路径
+    - result 用 JSONB 存完整报告（Markdown 文本 + 结构化评分）
+    - match_params_snapshot 保存分析时的偏好参数，便于复盘
+    - status 支持异步分析状态追踪（Agent 流式输出期间为 pending）
+
+    Agent 集成：
+    - FateAnalysisAgent 完成后更新 result 和 status
+    - 前端通过轮询 GET /api/fate/analyses/{id} 获取实时状态
+    """
+    __tablename__ = "fate_analyses"
+    __table_args__ = (
+        Index("idx_fate_analyses_initiator", "initiator_id", "created_at"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    analysis_id: Mapped[str] = mapped_column(String(40), unique=True, nullable=False)
+    initiator_id: Mapped[str] = mapped_column(
+        String(20), ForeignKey("users.user_id"), nullable=False, index=True,
+    )
+    analysis_type: Mapped[str] = mapped_column(
+        String(30), nullable=False,
+        comment="group_overview | deep_compatibility | comm_advice | comparison",
+    )
+    candidate_ids: Mapped[list] = mapped_column(JSONB, default=list)
+    result: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
+    match_params_snapshot: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
+    parent_analysis_id: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
+    status: Mapped[str] = mapped_column(String(20), default="pending")
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    initiator: Mapped["User"] = relationship(foreign_keys=[initiator_id])
+
+
+# ============================================================
+# notifications - 通知表
+# ============================================================
+
+class Notification(Base):
+    """
+    通知表 - 系统和互动事件通知。
+
+    通知类型：
+    - fate_added:    有人把你加入心动清单
+    - mutual_fate:   双向心动（你也把对方加了）
+    - analysis_done: 缘分分析完成
+    - new_message:   新私信
+
+    学习要点：
+    - JSONB payload 存储通知的扩展数据（灵活结构）
+    - GIN 索引加速按 recipient_id + is_read 的查询
+    """
+    __tablename__ = "notifications"
+    __table_args__ = (
+        Index("idx_notifications_recipient", "recipient_id", "is_read", "created_at"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    notif_id: Mapped[str] = mapped_column(String(40), unique=True, nullable=False)
+    recipient_id: Mapped[str] = mapped_column(
+        String(20), ForeignKey("users.user_id"), nullable=False, index=True,
+    )
+    type: Mapped[str] = mapped_column(String(30), nullable=False)
+    actor_id: Mapped[Optional[str]] = mapped_column(
+        String(20), ForeignKey("users.user_id"), nullable=True,
+    )
+    payload: Mapped[dict] = mapped_column(JSONB, default=dict)
+    is_read: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    recipient: Mapped["User"] = relationship(foreign_keys=[recipient_id])
+    actor: Mapped[Optional["User"]] = relationship(foreign_keys=[actor_id])
