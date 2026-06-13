@@ -355,3 +355,39 @@ export interface MatchParams {
   target_height_max?: number
   target_education?: string
 }
+
+// ============================================================
+// Phase 3c：匹配会话 + SSE 类型
+// ============================================================
+
+/** SSE 候选人预览 */
+export interface SSECandidate {
+  user_id: string
+  nickname: string
+  age: number
+  city: string
+  avatar_url: string | null
+  score: number
+}
+
+/** SSE 事件（服务器推送的每一条事件） */
+export interface SSEEvent {
+  event: string        // "agent_start" | "tool_call" | "tool_result" | "agent_complete"
+                       // | "hitl_preview" | "complete" | "error" | "stream_end" | "keepalive"
+  node?: string        // LangGraph 节点名，如 "intent_agent"
+  emoji?: string       // UI 图标
+  msg?: string         // 描述文字
+  tool?: string        // 工具名（tool_call 事件）
+  status?: string      // "calling" | "done"
+  candidates?: SSECandidate[]
+  retrieval_note?: string
+  candidate_count?: number
+  match_id?: string
+  result_count?: number
+}
+
+/** 开始匹配响应 */
+export interface MatchStartResponse {
+  session_id: string
+  message: string
+}

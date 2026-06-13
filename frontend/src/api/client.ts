@@ -324,4 +324,22 @@ export const markAllNotificationsRead = (): Promise<AxiosResponse<void>> =>
 export const getUnreadCount = (): Promise<AxiosResponse<{ unread_count: number }>> =>
   api.get('/notifications/unread-count')
 
+// ============================================================
+// Phase 3c：匹配会话 API（SSE + HITL）
+// ============================================================
+
+import type { MatchStartResponse } from '@/types'
+
+/** 创建匹配会话，启动 Agent 工作流 */
+export const startMatch = (userFilters?: Record<string, unknown>): Promise<AxiosResponse<MatchStartResponse>> =>
+  api.post('/match/start', { user_filters: userFilters ?? null })
+
+/** HITL 恢复：用户确认候选人后继续深度分析 */
+export const resumeMatch = (sessionId: string, action = 'proceed'): Promise<AxiosResponse<void>> =>
+  api.post(`/match/${sessionId}/resume`, { action }, { validateStatus: (s) => s === 204 })
+
+/** 获取匹配会话最终结果 */
+export const getMatchResult = (sessionId: string): Promise<AxiosResponse<{ status: string; result: unknown }>> =>
+  api.get(`/match/${sessionId}/result`)
+
 export default api
