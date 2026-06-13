@@ -57,63 +57,43 @@ def _generate_user_id() -> str:
 @router.post("/register", response_model=UserResponse, status_code=201)
 async def register(body: UserCreate, db: AsyncSession = Depends(get_db)):
     """
-    注册新用户。
+    注册新用户（简化版：仅昵称+性别+手机号+密码）。
 
     学习要点：
     - 密码用 bcrypt 加密后存储，绝不保存明文
     - user_id 由服务端自动生成（U + 8位随机），用户不能指定
     - 注册成功后同时返回 Token，用户无需再次登录
+    - profile_complete=False，引导用户稍后完善资料
 
     流程：
-    1. 检查邮箱/手机是否已注册（防重复）
-    2. 创建 User 记录（密码加密）
+    1. 检查手机号是否已注册（防重复）
+    2. 创建 User 记录（密码加密，仅基本字段）
     3. 生成 JWT Token
     4. 返回用户信息 + Token
     """
-    # 1. 检查邮箱唯一性（如果提供了邮箱）
-    if body.email:
-        existing = await db.execute(select(User).where(User.email == body.email))
-        if existing.scalar_one_or_none():
-            raise HTTPException(400, "该邮箱已被注册")
+    # 检查手机号唯一性
+    existing = await db.execute(select(User).where(User.phone == body.phone))
+    if existing.scalar_one_or_none():
+        raise HTTPException(400, "该手机号已被注册")
 
-    # 2. 检查手机唯一性（如果提供了手机）
-    if body.phone:
-        existing = await db.execute(select(User).where(User.phone == body.phone))
-        if existing.scalar_one_or_none():
-            raise HTTPException(400, "该手机号已被注册")
-
-    # 3. 创建用户
+    # 创建用户（只包含注册必填字段，其余保持默认值）
     user_id = _generate_user_id()
     user = User(
         user_id=user_id,
         nickname=body.nickname,
         gender=body.gender,
-        age=body.age,
-        city=body.city,
-        province=body.province,
-        education=body.education,
-        annual_income=body.annual_income,
-        marital_status=body.marital_status,
-        mbti=body.mbti,
-        about_me=body.about_me,
-        ideal_partner=body.ideal_partner,
-        hobbies=body.hobbies,
-        target_gender=body.target_gender,
-        target_age_min=body.target_age_min,
-        target_age_max=body.target_age_max,
-        target_city=body.target_city,
-        password_hash=hash_password(body.password),
-        email=body.email,
         phone=body.phone,
+        password_hash=hash_password(body.password),
+        target_gender="女" if body.gender == "男" else "男",
+        profile_complete=False,
     )
     db.add(user)
-    await db.flush()  # flush 让数据库分配 ID，但不提交事务
+    await db.flush()
 
-    # 4. 生成 Token
+    # 生成 Token
     access_token = create_access_token(user_id, user.nickname)
     refresh_token = create_refresh_token(user_id)
 
-    # 5. 返回用户信息（通过 response headers 传递 Token）
     return UserResponse(
         **user.to_dict(),
         access_token=access_token,
@@ -142,9 +122,9 @@ async def login(
     - 错误消息统一为"账号或密码错误"，不区分"用户不存在"和"密码错误"
     - 这样攻击者无法通过错误消息枚举有效账号
     """
-    # 1. 查找用户（支持邮箱或 user_id 登录）
+    # 1. 查找用户（支持手机号/邮箱/user_id 登录）
     query = select(User).where(
-        (User.email == body.account) | (User.user_id == body.account)
+        (User.phone == body.account) | (User.email == body.account) | (User.user_id == body.account)
     )
     result = await db.execute(query)
     user = result.scalar_one_or_none()
@@ -268,14 +248,32 @@ async def update_me(
 
     # 部分更新：只修改传入的字段
     update_data = body.model_dump(exclude_unset=True)
+
+    # 特殊处理 birth_date：自动计算星座、属相、年龄
+    if "birth_date" in update_data and update_data["birth_date"]:
+        from datetime import date as date_
+        from core.utils.zodiac import update_zodiac_fields
+        try:
+            bd = date_.fromisoformat(update_data.pop("birth_date"))
+            update_zodiac_fields(user, bd)
+        except ValueError:
+            raise HTTPException(400, "birth_date 格式应为 YYYY-MM-DD")
+    else:
+        update_data.pop("birth_date", None)
+
     for field, value in update_data.items():
         if hasattr(user, field):
             setattr(user, field, value)
 
+    # 自动判断资料是否已完善（以下字段全部非空则视为完善）
+    required_fields = ["nickname", "gender", "age", "city", "about_me", "ideal_partner"]
+    user.profile_complete = all(
+        getattr(user, f) not in (None, "", 0) for f in required_fields
+    )
+
     await db.flush()
 
     # 如果修改了影响向量搜索的字段，触发 ChromaDB 后台同步
-    # VECTOR_FIELDS 在 chroma_sync.py 中定义，包含影响向量质量的字段集合
     from core.tasks.chroma_sync import VECTOR_FIELDS, sync_user_vector
     if VECTOR_FIELDS.intersection(update_data.keys()):
         background_tasks.add_task(sync_user_vector, user_id=user_id, user=user)
