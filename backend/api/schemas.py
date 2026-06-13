@@ -12,7 +12,7 @@
 """
 
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
 
 
@@ -22,32 +22,13 @@ from datetime import datetime
 
 class UserCreate(BaseModel):
     """
-    创建用户时的请求体。
-    不需要传 user_id，系统会自动生成。
+    注册请求体 - 简化版，只需 4 个字段。
+    其他资料可在注册后通过 PUT /api/auth/me 完善。
     """
-    nickname: str = Field(description="用户昵称", min_length=1, max_length=20)
-    gender: str = Field(description="性别: male / female")
-    age: int = Field(description="年龄", ge=18, le=80)
-    city: str = Field(description="所在城市")
-    province: str = Field(description="所在省份")
-    education: str = Field(default="本科", description="学历")
-    annual_income: str = Field(default="未填写", description="年收入范围")
-    marital_status: str = Field(default="未婚", description="婚姻状况")
-
-    target_gender: str = Field(description="期望对方性别")
-    target_age_min: int = Field(default=18, ge=18, le=80)
-    target_age_max: int = Field(default=45, ge=18, le=80)
-    target_city: str = Field(default="不限")
-
-    about_me: str = Field(description="关于我", min_length=10)
-    ideal_partner: str = Field(description="理想的Ta", min_length=10)
-    hobbies: str = Field(default="", description="兴趣爱好，逗号分隔")
-    mbti: str = Field(default="未知", description="MBTI 性格类型")
-
-    # v2: 认证字段
-    password: str = Field(description="密码（至少6位）", min_length=6)
-    email: Optional[str] = Field(default=None, description="邮箱（可选）")
-    phone: Optional[str] = Field(default=None, description="手机号（可选）")
+    nickname: str = Field(description="用户昵称", min_length=2, max_length=20)
+    gender: str = Field(description="性别: 男 / 女", pattern="^(男|女)$")
+    phone: str = Field(description="手机号", pattern=r"^1[3-9]\d{9}$")
+    password: str = Field(description="密码（至少8位）", min_length=8, max_length=50)
 
 
 class UserUpdate(BaseModel):
@@ -62,45 +43,58 @@ class UserUpdate(BaseModel):
     education: Optional[str] = None
     annual_income: Optional[str] = None
     marital_status: Optional[str] = None
+    height_cm: Optional[int] = None
+
+    birth_date: Optional[str] = None  # 格式: YYYY-MM-DD，自动计算星座/属相/年龄
 
     target_gender: Optional[str] = None
     target_age_min: Optional[int] = Field(default=None, ge=18, le=80)
     target_age_max: Optional[int] = Field(default=None, ge=18, le=80)
     target_city: Optional[str] = None
+    target_height_min: Optional[int] = None
+    target_height_max: Optional[int] = None
+    target_education: Optional[str] = None
 
-    about_me: Optional[str] = Field(default=None, min_length=10)
-    ideal_partner: Optional[str] = Field(default=None, min_length=10)
+    about_me: Optional[str] = Field(default=None, min_length=5)
+    ideal_partner: Optional[str] = Field(default=None, min_length=5)
     hobbies: Optional[str] = None
     mbti: Optional[str] = None
 
 
 class UserResponse(BaseModel):
     """
-    用户信息的响应体（对外暴露的公开信息）。
+    用户信息的响应体（登录用户自己的完整信息）。
     """
     user_id: str
     nickname: str
     gender: str
-    age: int
-    city: str
-    province: str
-    education: str
-    annual_income: str
-    marital_status: str
-    target_gender: str
-    target_age_min: int
-    target_age_max: int
-    target_city: str
-    about_me: str
-    ideal_partner: str
-    hobbies: str
-    mbti: str
+    age: Optional[int] = None
+    city: Optional[str] = None
+    province: Optional[str] = None
+    education: Optional[str] = None
+    annual_income: Optional[str] = None
+    marital_status: Optional[str] = None
+    target_gender: Optional[str] = None
+    target_age_min: Optional[int] = None
+    target_age_max: Optional[int] = None
+    target_city: Optional[str] = None
+    target_height_min: Optional[int] = None
+    target_height_max: Optional[int] = None
+    target_education: Optional[str] = None
+    about_me: Optional[str] = None
+    ideal_partner: Optional[str] = None
+    hobbies: Optional[str] = None
+    mbti: Optional[str] = None
     height_cm: Optional[int] = None
     avatar_url: Optional[str] = None
     photos: list[str] = []
+    birth_date: Optional[str] = None
+    zodiac_sign: Optional[str] = None
+    chinese_zodiac: Optional[str] = None
+    profile_complete: bool = False
     created_at: Optional[str] = None
 
-    # v2: 认证 Token（仅注册/登录时返回）
+    # 认证 Token（仅注册/登录时返回）
     access_token: Optional[str] = None
     refresh_token: Optional[str] = None
 
@@ -117,22 +111,23 @@ class UserPublicResponse(BaseModel):
     user_id: str
     nickname: str
     gender: str
-    age: int
-    city: str
-    province: str
-    education: str
-    annual_income: str
-    marital_status: str
-    mbti: str
+    age: Optional[int] = None
+    city: Optional[str] = None
+    province: Optional[str] = None
+    education: Optional[str] = None
+    annual_income: Optional[str] = None
+    marital_status: Optional[str] = None
+    mbti: Optional[str] = None
     height_cm: Optional[int] = None
     about_me: str = ""
     hobbies: str = ""
     avatar_url: Optional[str] = None
     photos: list[str] = []
+    birth_date: Optional[str] = None
+    zodiac_sign: Optional[str] = None
+    chinese_zodiac: Optional[str] = None
+    profile_complete: bool = False
     created_at: Optional[str] = None
-    follower_count: int = 0
-    following_count: int = 0
-    match_count: int = 0
 
 
 class UserListResponse(BaseModel):
@@ -191,3 +186,59 @@ class MessageResponse(BaseModel):
     message: str
     success: bool = True
     data: Optional[dict] = None
+
+
+# ============================================================
+# 心动 TA 们 / 缘分分析 / 通知 Schema
+# ============================================================
+
+class FateCandidateResponse(BaseModel):
+    """心动清单中的单个候选者"""
+    candidate_id: str
+    note: Optional[str] = None
+    added_at: str
+    candidate: UserPublicResponse
+
+
+class FateCandidateListResponse(BaseModel):
+    """心动清单列表"""
+    items: List[FateCandidateResponse]
+    total: int
+
+
+class FateAnalysisCreate(BaseModel):
+    """发起缘分分析的请求体"""
+    analysis_type: str = Field(
+        ...,
+        pattern="^(group_overview|deep_compatibility|comm_advice|comparison)$",
+        description="分析类型: group_overview(一层) | deep_compatibility/comm_advice/comparison(二层三路径)",
+    )
+    candidate_ids: List[str] = Field(..., min_length=1, max_length=20, description="候选者 user_id 列表")
+    match_params_override: Optional[dict] = Field(default=None, description="临时覆盖的偏好参数（仅本次有效）")
+    parent_analysis_id: Optional[str] = Field(default=None, description="关联的第一层分析 ID（二层时传入）")
+
+
+class FateAnalysisResponse(BaseModel):
+    """缘分分析记录响应"""
+    analysis_id: str
+    analysis_type: str
+    candidate_ids: List[str]
+    result: Optional[dict] = None
+    status: str
+    created_at: str
+
+
+class NotificationResponse(BaseModel):
+    """通知响应"""
+    notif_id: str
+    type: str
+    actor_id: Optional[str] = None
+    payload: dict = {}
+    is_read: bool
+    created_at: str
+
+
+class NotificationListResponse(BaseModel):
+    """通知列表响应"""
+    items: List[NotificationResponse]
+    unread_count: int
