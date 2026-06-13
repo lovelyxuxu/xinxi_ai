@@ -1,265 +1,279 @@
-/**
- * 心犀AI v3 — 暗色主题设计系统（Tailwind v4 + shadcn/ui）
- * ============================================================
- *
- * 【学习要点 — Tailwind v4 与 v3 的主要区别】
- * v4 不再使用 tailwind.config.js，所有主题配置都在 CSS 文件中完成：
- * - @import "tailwindcss"：替代 @tailwind base/components/utilities
- * - @theme inline：把 CSS 变量映射到 Tailwind 工具类
- * - 直接在 :root 中定义 CSS 变量，组件通过 var(--xxx) 引用
- *
- * 【设计语言】
- * 暗色渐变 + 磨砂玻璃 + 小红书/Soul 风格
- * - 主背景：深空黑（#0a0a0f）
- * - 主色调：玫红 (#e91e8c) → 紫 (#9c27b0) 渐变
- * - 卡片：rgba 磨砂玻璃效果（backdrop-filter: blur）
- */
-
-/* Tailwind v4 入口 */
 @import "tailwindcss";
 
-/* shadcn/ui 动画库 */
-@import "tw-animate-css";
-
-/* ============================================================
-   CSS 变量 — 暗色主题（全局激活，不需要 .dark 类）
-   ============================================================
-   颜色格式: oklch(亮度 色度 色相)
-   - 亮度 0=黑, 1=白
-   - 色度 0=无色, 越大越鲜艳
-   - 色相 0-360 度
-*/
-@layer base {
-  :root {
-    /* === 背景 === */
-    --background: oklch(0.08 0.01 270);       /* 深空黑 #0a0a0f */
-    --foreground: oklch(0.94 0.005 270);      /* 主文字 #f0f0f5 */
-
-    /* === 卡片 === */
-    --card: oklch(0.12 0.01 270);             /* 卡片背景 #131318 */
-    --card-foreground: oklch(0.94 0.005 270);
-
-    /* === Popover（下拉菜单） === */
-    --popover: oklch(0.14 0.01 270);
-    --popover-foreground: oklch(0.94 0.005 270);
-
-    /* === 主色调：玫红 === */
-    --primary: oklch(0.55 0.23 340);          /* #e91e8c 玫红 */
-    --primary-foreground: oklch(1 0 0);
-
-    /* === 次要色：紫 === */
-    --secondary: oklch(0.45 0.2 295);         /* #9c27b0 紫色 */
-    --secondary-foreground: oklch(1 0 0);
-
-    /* === 低调/辅助 === */
-    --muted: oklch(0.18 0.01 270);            /* 暗灰 #2a2a30 */
-    --muted-foreground: oklch(0.55 0.01 270); /* 辅助文字 #8b8b9e */
-
-    /* === 强调（角标、高亮） === */
-    --accent: oklch(0.65 0.22 340);           /* 亮粉 #ff6b9d */
-    --accent-foreground: oklch(1 0 0);
-
-    /* === 危险/错误 === */
-    --destructive: oklch(0.577 0.245 27.325);
-    --destructive-foreground: oklch(1 0 0);
-
-    /* === 边框和输入框 === */
-    --border: oklch(0.22 0.01 270);           /* 细边框 */
-    --input: oklch(0.18 0.01 270);
-    --ring: oklch(0.55 0.23 340);             /* 焦点环，用主色 */
-
-    /* === 圆角 === */
-    --radius: 0.75rem;
-
-    /* === 图表颜色 === */
-    --chart-1: oklch(0.55 0.23 340);
-    --chart-2: oklch(0.55 0.2 160);
-    --chart-3: oklch(0.45 0.15 40);
-    --chart-4: oklch(0.65 0.22 60);
-    --chart-5: oklch(0.7 0.25 30);
-
-    /* === 侧边栏 === */
-    --sidebar: oklch(0.12 0.01 270);
-    --sidebar-foreground: oklch(0.94 0.005 270);
-    --sidebar-primary: oklch(0.55 0.23 340);
-    --sidebar-primary-foreground: oklch(1 0 0);
-    --sidebar-accent: oklch(0.18 0.01 270);
-    --sidebar-accent-foreground: oklch(0.94 0.005 270);
-    --sidebar-border: oklch(0.22 0.01 270);
-    --sidebar-ring: oklch(0.55 0.23 340);
-  }
-}
-
-/* ============================================================
-   Tailwind v4 主题映射
-   把 CSS 变量绑定到 Tailwind 工具类
-   ============================================================ */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
-  --color-popover: var(--popover);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-secondary: var(--secondary);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-destructive: var(--destructive);
-  --color-destructive-foreground: var(--destructive-foreground);
-  --color-border: var(--border);
-  --color-input: var(--input);
-  --color-ring: var(--ring);
-  --color-chart-1: var(--chart-1);
-  --color-chart-2: var(--chart-2);
-  --color-chart-3: var(--chart-3);
-  --color-chart-4: var(--chart-4);
-  --color-chart-5: var(--chart-5);
-  --color-sidebar: var(--sidebar);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-ring: var(--sidebar-ring);
-  --radius-lg: var(--radius);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-xl: calc(var(--radius) + 4px);
-  --radius-2xl: calc(var(--radius) + 8px);
+  /* ── 主色系（深靛蓝 INS 风）─────────────────────── */
+  --color-bg-base:      #0f0c29;
+  --color-bg-elevated:  #1a1040;
+  --color-bg-deep:      #1e0a3c;
+  --color-bg-card:      rgba(255, 255, 255, 0.07);
 
-  /* 保留常用颜色直接访问 */
-  --color-rose-500: #f43f5e;
-  --color-pink-500: #ec4899;
+  /* ── 渐变 ──────────────────────────────────────── */
+  --gradient-primary:   linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  --gradient-heart:     linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  --gradient-ai:        linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+  --gradient-gold:      linear-gradient(135deg, #f6d365 0%, #fda085 100%);
+
+  /* ── 文字色 ───────────────────────────────────────── */
+  --color-text-primary:   #f0f0f8;
+  --color-text-secondary: #a0a0c0;
+  --color-text-muted:     #6060a0;
+
+  /* ── 边框/分割 ──────────────────────────────────── */
+  --color-border:         rgba(255, 255, 255, 0.12);
+  --color-border-strong:  rgba(255, 255, 255, 0.20);
+
+  /* ── 语义色 ─────────────────────────────────────── */
+  --color-success: #4ade80;
+  --color-warning: #fbbf24;
+  --color-danger:  #f87171;
+
+  /* ── 字体 ───────────────────────────────────────── */
+  --font-sans: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, sans-serif;
+
+  /* ── 圆角 ───────────────────────────────────────── */
+  --radius-sm:  8px;
+  --radius-md:  12px;
+  --radius-lg:  20px;
+  --radius-xl:  28px;
 }
 
-/* ============================================================
-   全局基础样式
-   ============================================================ */
-* {
-  border-color: var(--border);
+/* ── 全局重置 ───────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+
+html {
+  font-size: 15px;
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
   margin: 0;
-  background-color: oklch(0.08 0.01 270);
-  color: var(--foreground);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
-    "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
-  -webkit-font-smoothing: antialiased;
   min-height: 100vh;
-  /* 全局背景：两个光晕渐变叠加，产生深邃的宇宙感 */
-  background-image:
-    radial-gradient(ellipse 80% 50% at 20% -10%, rgba(233,30,140,0.12) 0%, transparent 60%),
-    radial-gradient(ellipse 60% 40% at 85% 90%, rgba(156,39,176,0.10) 0%, transparent 60%);
+  background: linear-gradient(135deg, #0f0c29 0%, #1a1040 50%, #1e0a3c 100%);
   background-attachment: fixed;
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  line-height: 1.6;
 }
 
-#root {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
+/* 顶部径向发光，增加深度感 */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(ellipse at 20% 10%, rgba(102, 126, 234, 0.18) 0%, transparent 55%),
+    radial-gradient(ellipse at 80% 80%, rgba(240, 147, 251, 0.12) 0%, transparent 55%);
+  pointer-events: none;
+  z-index: 0;
 }
 
-/* ============================================================
-   磨砂玻璃卡片效果
-   【学习要点】
-   backdrop-filter: blur() — 让元素背后的内容模糊，产生磨砂感
-   需要父元素有可见背景，这里 body 的渐变背景提供了"底色"
-   -webkit-backdrop-filter: blur() — 兼容 Safari（iOS 必须）
-   ============================================================ */
+#root { position: relative; z-index: 1; }
+
+/* ── 玻璃卡片 ───────────────────────────────────────────── */
 .glass-card {
-  background: rgba(255, 255, 255, 0.04);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: var(--radius);
-}
-
-/* 带品牌色光晕边框的磨砂卡片（用于重点卡片、表单等） */
-.glass-card-glow {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--color-bg-card);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(233, 30, 140, 0.2);
-  border-radius: var(--radius);
-  box-shadow:
-    0 0 30px rgba(233, 30, 140, 0.08),
-    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
 }
 
-/* ============================================================
-   渐变文字（Logo、标题用）
-   ============================================================ */
-.gradient-text {
-  background: linear-gradient(135deg, #e91e8c 0%, #9c27b0 100%);
+.glass-card-hover {
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.glass-card-hover:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 60px rgba(102, 126, 234, 0.25);
+  border-color: rgba(102, 126, 234, 0.4);
+}
+
+/* ── 渐变按钮 ───────────────────────────────────────────── */
+.btn-primary {
+  background: var(--gradient-primary);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-md);
+  padding: 10px 24px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s, transform 0.1s, box-shadow 0.2s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-primary:hover {
+  opacity: 0.92;
+  box-shadow: 0 8px 24px rgba(118, 75, 162, 0.45);
+}
+
+.btn-primary:active { transform: scale(0.97); }
+
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn-heart {
+  background: var(--gradient-heart);
+  color: #fff;
+  border: none;
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.btn-heart:hover {
+  transform: scale(1.15);
+  box-shadow: 0 0 16px rgba(240, 147, 251, 0.6);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  padding: 9px 20px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-ghost:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+/* ── 输入框 ─────────────────────────────────────────────── */
+.input-dark {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-primary);
+  padding: 10px 14px;
+  font-size: 15px;
+  width: 100%;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.input-dark::placeholder { color: var(--color-text-muted); }
+
+.input-dark:focus {
+  border-color: rgba(102, 126, 234, 0.6);
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.15);
+}
+
+/* ── 渐变文字 ───────────────────────────────────────────── */
+.text-gradient-primary {
+  background: var(--gradient-primary);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
 
-/* ============================================================
-   主渐变背景（用于主按钮、凸起 FAB 等）
-   bg-gradient-primary 会通过 @theme 注册，这里作为补充
-   ============================================================ */
-.bg-gradient-primary {
-  background: linear-gradient(135deg, #e91e8c 0%, #9c27b0 100%);
+.text-gradient-heart {
+  background: var(--gradient-heart);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
-/* ============================================================
-   移动端安全区域（底部导航适配 iPhone Home 指示条）
-   env(safe-area-inset-bottom) — 获取 iOS 底部安全区域高度
-   ============================================================ */
-.pb-safe {
-  padding-bottom: max(env(safe-area-inset-bottom, 0px), 8px);
-}
-
-/* ============================================================
-   滚动条美化（暗色主题配套）
-   ============================================================ */
-::-webkit-scrollbar { width: 4px; height: 4px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb {
-  background: var(--muted);
-  border-radius: 2px;
-}
-::-webkit-scrollbar-thumb:hover { background: var(--muted-foreground); }
-
-/* ============================================================
-   动画关键帧
-   ============================================================ */
-@keyframes heartbeat {
+/* ── 动画 ────────────────────────────────────────────────── */
+@keyframes pulse-heart {
   0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.15); }
+  50% { transform: scale(1.2); }
 }
-.animate-heartbeat { animation: heartbeat 1.2s ease-in-out infinite; }
 
 @keyframes fade-in-up {
   from { opacity: 0; transform: translateY(16px); }
-  to { opacity: 1; transform: translateY(0); }
+  to   { opacity: 1; transform: translateY(0); }
 }
-.animate-fade-in-up { animation: fade-in-up 0.3s ease forwards; }
 
 @keyframes slide-up {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; transform: translateY(30px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
-.animate-slide-up { animation: slide-up 0.2s ease-out forwards; }
 
-/* 按钮按压反馈 */
-.btn-press:active { transform: scale(0.97); }
-
-/* 暗色表单输入框样式（通用类，供 EditProfile 等页面使用） */
-.input-dark {
-  background: var(--muted) !important;
-  border-color: var(--border) !important;
-  color: var(--foreground) !important;
+@keyframes float-star {
+  0%, 100% { transform: translateY(0) rotate(0deg); opacity: 0.6; }
+  50%       { transform: translateY(-8px) rotate(180deg); opacity: 1; }
 }
-.input-dark::placeholder {
-  color: var(--muted-foreground) !important;
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.animate-fade-in-up  { animation: fade-in-up 0.5s ease both; }
+.animate-slide-up    { animation: slide-up  0.4s ease both; }
+.animate-pulse-heart { animation: pulse-heart 1s ease infinite; }
+.animate-spin        { animation: spin 0.8s linear infinite; }
+
+/* ── 心动脉冲标记 ────────────────────────────────────────── */
+.heart-active {
+  position: relative;
+}
+.heart-active::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  background: var(--gradient-heart);
+  opacity: 0.3;
+  animation: pulse-heart 1.5s ease infinite;
+}
+
+/* ── 标签/徽章 ──────────────────────────────────────────── */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 99px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.badge-zodiac {
+  background: rgba(240, 147, 251, 0.15);
+  border: 1px solid rgba(240, 147, 251, 0.3);
+  color: #f093fb;
+}
+
+.badge-mbti {
+  background: rgba(102, 126, 234, 0.15);
+  border: 1px solid rgba(102, 126, 234, 0.3);
+  color: #667eea;
+}
+
+/* ── 滚动条美化 ─────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: rgba(102, 126, 234, 0.4);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover { background: rgba(102, 126, 234, 0.7); }
+
+/* ── 分割线 ─────────────────────────────────────────────── */
+.divider {
+  border: none;
+  border-top: 1px solid var(--color-border);
+  margin: 16px 0;
+}
+
+/* ── 移动端优化 ─────────────────────────────────────────── */
+@media (max-width: 768px) {
+  html { font-size: 16px; }
 }
