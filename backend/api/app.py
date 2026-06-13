@@ -27,6 +27,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from api.routers import users, matching, interview, auth
+from api.routers.fate import router as fate_router
+from api.routers.notifications import router as notifications_router
 
 # 上传文件目录（相对于 backend/ 目录）
 UPLOADS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "uploads")
@@ -124,10 +126,12 @@ def create_app() -> FastAPI:
     # ============================================================
     # 注册路由
     # ============================================================
-    app.include_router(auth.router)       # v2: 认证路由（注册/登录/JWT）
+    app.include_router(auth.router)         # v2: 认证路由（注册/登录/JWT）
     app.include_router(users.router)
     app.include_router(matching.router)
     app.include_router(interview.router)
+    app.include_router(fate_router)         # v3: 心动清单 + 缘分分析
+    app.include_router(notifications_router)  # v3: 通知系统
 
     # ============================================================
     # 静态文件托管（用户上传的图片）
