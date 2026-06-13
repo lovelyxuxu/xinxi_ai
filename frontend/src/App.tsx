@@ -60,8 +60,11 @@ export default function App() {
       <BottomNav />
 
       {/* 桌面端页脚（移动端隐藏） */}
-      <footer className="hidden md:block text-center py-4 text-xs text-muted-foreground border-t border-border">
-        心犀AI · 基于 Agent + Hybrid RAG 的智能婚恋匹配系统
+      <footer
+        className="hidden md:block text-center py-4 text-xs"
+        style={{ color: 'var(--color-text-muted)', borderTop: '1px solid var(--color-border)' }}
+      >
+        心犀AI · 基于 Agent + LangGraph + RAG 的智能婚恋匹配系统
       </footer>
     </div>
   )

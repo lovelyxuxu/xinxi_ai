@@ -10,7 +10,6 @@ import { useForm } from 'react-hook-form'
 import { motion } from 'framer-motion'
 import { Sparkles, Eye, EyeOff } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
-import { register as apiRegister } from '@/api/client'
 
 interface RegisterForm {
   nickname: string
@@ -20,7 +19,7 @@ interface RegisterForm {
 }
 
 export default function Register() {
-  const { login } = useAuth()
+  const { register: authRegister } = useAuth()
   const navigate = useNavigate()
   const [showPassword, setShowPassword] = useState(false)
   const [apiError, setApiError] = useState('')
@@ -38,10 +37,7 @@ export default function Register() {
   const onSubmit = async (data: RegisterForm) => {
     setApiError('')
     try {
-      const result = await apiRegister(data)
-      if (result.access_token) {
-        login(result.access_token, result)
-      }
+      await authRegister(data)
       navigate('/')
     } catch (err: unknown) {
       const e = err as { response?: { data?: { detail?: string } }; message?: string }

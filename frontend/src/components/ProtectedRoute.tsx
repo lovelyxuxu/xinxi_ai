@@ -4,18 +4,19 @@
  *
  * 【学习要点 — 路由守卫模式】
  * 路由守卫（Route Guard）是一种访问控制模式：
- * - 某些页面只有登录用户才能访问（如个人中心、匹配历史）
- * - 未登录用户访问这些页面时，自动重定向到登录页
- * - 类似于后端的 get_current_user 依赖注入，但这是前端版本
+ * - requireAuth=true: 只有登录用户才能访问
+ * - requireProfileComplete=true: 还需要完善过资料（profile_complete=true）
  *
- * 实现原理：
- * - 用 useAuth() 检查认证状态
- * - 已登录 → 渲染子组件（children）
- * - 未登录 → <Navigate> 重定向到 /login
+ * 权限层级（低→高）：
+ * 游客 → 登录用户 → 完善资料的用户
  *
- * 使用方式：
- *   <Route path="/history" element={
- *     <ProtectedRoute><MatchHistory /></ProtectedRoute>
+ * 使用示例：
+ *   // 需要登录
+ *   <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+ *
+ *   // 需要完善资料（缘分分析功能）
+ *   <Route path="/fate/*" element={
+ *     <ProtectedRoute requireProfileComplete><FatePage /></ProtectedRoute>
  *   } />
  */
 import { Navigate, useLocation } from 'react-router-dom'
@@ -23,20 +24,44 @@ import { useAuth } from '@/contexts/AuthContext'
 
 interface ProtectedRouteProps {
   children: React.ReactNode
+  /** 是否需要登录（默认 true） */
+  requireAuth?: boolean
+  /** 是否需要完善资料（默认 false） */
+  requireProfileComplete?: boolean
+  /** 重定向目标（默认 /login） */
+  redirectTo?: string
 }
 
-export default function ProtectedRoute({ children }: ProtectedRouteProps) {
-  const { isAuthenticated } = useAuth()
+export default function ProtectedRoute({
+  children,
+  requireAuth = true,
+  requireProfileComplete = false,
+  redirectTo = '/login',
+}: ProtectedRouteProps) {
+  const { user, isAuthenticated, isLoading } = useAuth()
   const location = useLocation()
 
-  // 未登录 → 重定向到登录页，并记住来源页面
-  if (!isAuthenticated) {
-    // 【学习要点】
-    // state={{ from: location }} 把当前 URL 传递给登录页
-    // 登录成功后可以跳回原来的页面，用户体验更好
-    return <Navigate to="/login" state={{ from: location }} replace />
+  // 正在加载认证状态时显示占位
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div
+          className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin"
+          style={{ borderColor: 'rgba(102,126,234,0.6)', borderTopColor: 'transparent' }}
+        />
+      </div>
+    )
   }
 
-  // 已登录 → 正常渲染子组件
+  // 1. 需要登录但未登录 → 跳到登录页，记住来源
+  if (requireAuth && !isAuthenticated) {
+    return <Navigate to={redirectTo} state={{ from: location }} replace />
+  }
+
+  // 2. 需要完善资料但未完善 → 跳到编辑页，携带提示参数
+  if (requireProfileComplete && user && !user.profile_complete) {
+    return <Navigate to="/profile/edit?hint=complete_required" replace />
+  }
+
   return <>{children}</>
 }
